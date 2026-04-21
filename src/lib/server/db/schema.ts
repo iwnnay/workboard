@@ -12,12 +12,24 @@ export const task = sqliteTable('task', {
 		.notNull()
 });
 
+export const subtask = sqliteTable('subtask', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	taskId: text('task_id')
+		.notNull()
+		.references(() => task.id, { onDelete: 'cascade' }),
+	title: text('title').notNull(),
+	completed: integer('completed', { mode: 'boolean' }).notNull().default(false)
+});
+
 export const note = sqliteTable('note', {
 	id: text('id')
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
 	title: text('title').notNull(),
 	content: text('content').notNull(),
+	orderIndex: integer('order_index').notNull().default(0),
 	createdAt: integer('created_at', { mode: 'timestamp' })
 		.$defaultFn(() => new Date())
 		.notNull(),

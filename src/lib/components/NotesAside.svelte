@@ -14,6 +14,8 @@
 	let { notes }: Props = $props();
 	let showModal = $state(false);
 	let selectedNote = $state<Note | null>(null);
+	let draggedId = $state<string | null>(null);
+	let dragOverId = $state<string | null>(null);
 
 	function openNote(note: Note) {
 		selectedNote = note;
@@ -29,6 +31,58 @@
 		showModal = false;
 		selectedNote = null;
 	}
+
+	function handleDragStart(e: DragEvent, noteId: string) {
+		draggedId = noteId;
+		if (e.dataTransfer) {
+			e.dataTransfer.effectAllowed = 'move';
+		}
+	}
+
+	function handleDragOver(e: DragEvent, noteId: string) {
+		e.preventDefault();
+		if (draggedId && draggedId !== noteId) {
+			dragOverId = noteId;
+		}
+	}
+
+	function handleDragLeave() {
+		dragOverId = null;
+	}
+
+	async function handleDrop(e: DragEvent, targetId: string) {
+		e.preventDefault();
+		if (!draggedId || draggedId === targetId) {
+			draggedId = null;
+			dragOverId = null;
+			return;
+		}
+
+		const newOrder = [...notes];
+		const draggedIndex = newOrder.findIndex((n) => n.id === draggedId);
+		const targetIndex = newOrder.findIndex((n) => n.id === targetId);
+
+		if (draggedIndex !== -1 && targetIndex !== -1) {
+			const [draggedItem] = newOrder.splice(draggedIndex, 1);
+			newOrder.splice(targetIndex, 0, draggedItem);
+
+			await fetch('/api/notes/order', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ ids: newOrder.map((n) => n.id) })
+			});
+
+			window.location.reload();
+		}
+
+		draggedId = null;
+		dragOverId = null;
+	}
+
+	function handleDragEnd() {
+		draggedId = null;
+		dragOverId = null;
+	}
 </script>
 
 <aside class="notes-aside">
@@ -39,7 +93,16 @@
 
 	<ul class="note-list">
 		{#each notes as note (note.id)}
-			<li>
+			<li
+				class:dragging={draggedId === note.id}
+				class:drag-over={dragOverId === note.id}
+				draggable="true"
+				ondragstart={(e) => handleDragStart(e, note.id)}
+				ondragover={(e) => handleDragOver(e, note.id)}
+				ondragleave={handleDragLeave}
+				ondrop={(e) => handleDrop(e, note.id)}
+				ondragend={handleDragEnd}
+			>
 				<button class="note-item" onclick={() => openNote(note)}>
 					<span class="title">{note.title}</span>
 					<span class="date">
@@ -121,5 +184,21 @@
 	.note-item .date {
 		font-size: 0.75rem;
 		color: #999;
+	}
+
+	.note-list li {
+		cursor: grab;
+	}
+
+	.note-list li:active {
+		cursor: grabbing;
+	}
+
+	.note-list li.dragging {
+		opacity: 0.5;
+	}
+
+	.note-list li.drag-over {
+		border-top: 2px solid #333;
 	}
 </style>
