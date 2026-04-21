@@ -10,9 +10,10 @@
 
 	interface Props {
 		events: CalendarEvent[];
+		isAuthenticated: boolean;
 	}
 
-	let { events }: Props = $props();
+	let { events, isAuthenticated }: Props = $props();
 
 	function formatTime(date: Date): string {
 		return date.toLocaleTimeString('en-US', {
@@ -40,7 +41,11 @@
 <aside class="calendar-aside">
 	<div class="header">
 		<h2>Calendar</h2>
-		<button class="sync">↻</button>
+		{#if isAuthenticated}
+			<a href="/auth/logout" class="logout">Logout</a>
+		{:else}
+			<a href="/auth/login" class="login">Connect</a>
+		{/if}
 	</div>
 
 	<div class="events">
@@ -67,7 +72,9 @@
 		{/if}
 	</div>
 
-	<p class="note">Connect to Outlook to see your calendar</p>
+	{#if !isAuthenticated}
+		<p class="note">Connect to Outlook to see your calendar</p>
+	{/if}
 </aside>
 
 <style>
@@ -91,12 +98,29 @@
 		font-weight: 600;
 	}
 
-	.sync {
-		background: none;
-		border: none;
-		font-size: 1.25rem;
-		cursor: pointer;
+	.login,
+	.logout {
+		font-size: 0.75rem;
+		text-decoration: none;
+		padding: 0.25rem 0.5rem;
+		border-radius: 4px;
+	}
+
+	.login {
+		background: #0078d4;
+		color: white;
+	}
+
+	.login:hover {
+		background: #106ebe;
+	}
+
+	.logout {
 		color: #666;
+	}
+
+	.logout:hover {
+		color: #333;
 	}
 
 	.events {

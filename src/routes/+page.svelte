@@ -2,16 +2,12 @@
 	import Clock from '$lib/components/Clock.svelte';
 	import TodoList from '$lib/components/TodoList.svelte';
 	import NotesAside from '$lib/components/NotesAside.svelte';
-	import CalendarAside from '$lib/components/CalendarAside.svelte';
-
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 </script>
 
-<aside class="left-aside">
-	<CalendarAside events={data.events} />
-</aside>
+<aside class="left-aside"></aside>
 
 <main class="center">
 	<div class="clocks">

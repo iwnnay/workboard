@@ -21,22 +21,19 @@
 	}
 
 	:global(body) {
-		font-family: system-ui, -apple-system, sans-serif;
+		font-family:
+			system-ui,
+			-apple-system,
+			sans-serif;
 		background: #f5f5f5;
 		color: #333;
 	}
 
 	.app {
 		display: grid;
-		grid-template-columns: 250px 1fr 280px;
-		grid-template-areas: 'left center right';
+		grid-template-columns: 1fr 280px;
+		grid-template-areas: 'center right';
 		min-height: 100vh;
-	}
-
-	@media (max-width: 1024px) {
-		.app {
-			grid-template-columns: 200px 1fr 240px;
-		}
 	}
 
 	@media (max-width: 768px) {
@@ -44,8 +41,7 @@
 			grid-template-columns: 1fr;
 			grid-template-areas:
 				'center'
-				'right'
-				'left';
+				'right';
 		}
 	}
 </style>

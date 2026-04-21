@@ -12,6 +12,9 @@
 
 	let { todos }: Props = $props();
 
+	let completedTodos = $derived(todos.filter((t) => t.completed));
+	let activeTodos = $derived(todos.filter((t) => !t.completed));
+
 	let newTodoTitle = $state('');
 
 	async function addTodo(e: Event) {
@@ -47,28 +50,37 @@
 	<h2>Tasks</h2>
 
 	<form onsubmit={addTodo}>
-		<input
-			type="text"
-			placeholder="Add a task..."
-			bind:value={newTodoTitle}
-		/>
+		<input type="text" placeholder="Add a task..." bind:value={newTodoTitle} />
 	</form>
 
 	<ul>
-		{#each todos as todo (todo.id)}
-			<li class:completed={todo.completed}>
+		{#each activeTodos as todo (todo.id)}
+			<li>
 				<label>
-					<input
-						type="checkbox"
-						checked={todo.completed}
-						onchange={(e) => toggleTodo(todo.id, e.currentTarget.checked)}
-					/>
+					<input type="checkbox" checked={false} onchange={() => toggleTodo(todo.id, true)} />
 					<span>{todo.title}</span>
 				</label>
 				<button class="delete" onclick={() => removeTodo(todo.id)}>×</button>
 			</li>
 		{/each}
 	</ul>
+
+	{#if completedTodos.length > 0}
+		<div class="completed-section">
+			<h3>Completed</h3>
+			<ul>
+				{#each completedTodos as todo (todo.id)}
+					<li class="completed">
+						<label>
+							<input type="checkbox" checked={true} onchange={() => toggleTodo(todo.id, false)} />
+							<span>{todo.title}</span>
+						</label>
+						<button class="delete" onclick={() => removeTodo(todo.id)}>×</button>
+					</li>
+				{/each}
+			</ul>
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -85,7 +97,7 @@
 		margin-bottom: 1rem;
 	}
 
-	input[type="text"] {
+	input[type='text'] {
 		width: 100%;
 		padding: 0.5rem;
 		border: 1px solid #ddd;
@@ -93,7 +105,7 @@
 		font-size: 0.9rem;
 	}
 
-	input[type="text"]:focus {
+	input[type='text']:focus {
 		outline: none;
 		border-color: #666;
 	}
@@ -126,6 +138,23 @@
 	li.completed span {
 		text-decoration: line-through;
 		color: #999;
+	}
+
+	.completed-section {
+		margin-top: 1.5rem;
+		padding-top: 1rem;
+		border-top: 1px solid #eee;
+	}
+
+	.completed-section h3 {
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: #666;
+		margin-bottom: 0.5rem;
+	}
+
+	.completed-section ul {
+		margin-top: 0;
 	}
 
 	.delete {
