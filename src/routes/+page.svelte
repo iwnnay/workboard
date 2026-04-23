@@ -53,6 +53,6 @@
 
 	.right-aside {
 		grid-area: right;
-		padding: 1rem;
+		padding: 1rem 0.5rem 1rem 1rem;
 	}
 </style>

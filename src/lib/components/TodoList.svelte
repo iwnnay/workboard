@@ -37,6 +37,8 @@
 	let focusedTaskId = $state<string | null>(
 		typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('focusSubtaskTaskId') : null
 	);
+	let editingTaskId = $state<string | null>(null);
+	let editingTitle = $state('');
 	if (focusedTaskId && typeof window !== 'undefined') {
 		sessionStorage.removeItem('focusSubtaskTaskId');
 		$effect(() => {
@@ -128,6 +130,33 @@
 		await fetch(`/api/todos/subtasks/${id}`, { method: 'DELETE' });
 		window.location.reload();
 	}
+
+	function startEditing(taskId: string, title: string) {
+		editingTaskId = taskId;
+		editingTitle = title;
+	}
+
+	async function finishEditing() {
+		if (!editingTaskId || !editingTitle.trim()) {
+			editingTaskId = null;
+			return;
+		}
+		await fetch(`/api/todos/${editingTaskId}`, {
+			method: 'PATCH',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ title: editingTitle })
+		});
+		editingTaskId = null;
+		window.location.reload();
+	}
+
+	function handleKeydown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			finishEditing();
+		} else if (e.key === 'Escape') {
+			editingTaskId = null;
+		}
+	}
 </script>
 
 <div class="todo-list">
@@ -162,7 +191,21 @@
 							checked={allSubtasksCompleted(todo)}
 							onchange={() => toggleTodo(todo.id, !allSubtasksCompleted(todo))}
 						/>
-						<span>{todo.title}</span>
+						{#if editingTaskId === todo.id}
+							<input
+								type="text"
+								class="edit-input"
+								bind:value={editingTitle}
+								onblur={finishEditing}
+								onkeydown={handleKeydown}
+							/>
+						{:else}
+							<span
+								ondblclick={() => startEditing(todo.id, todo.title)}
+							>
+								{todo.title}
+							</span>
+						{/if}
 					</label>
 					<button
 						class="add-subtask-btn"
@@ -227,7 +270,21 @@
 							{/if}
 							<label>
 								<input type="checkbox" checked={true} onchange={() => toggleTodo(todo.id, false)} />
-								<span>{todo.title}</span>
+								{#if editingTaskId === todo.id}
+									<input
+										type="text"
+										class="edit-input"
+										bind:value={editingTitle}
+										onblur={finishEditing}
+										onkeydown={handleKeydown}
+									/>
+								{:else}
+									<span
+										ondblclick={() => startEditing(todo.id, todo.title)}
+									>
+										{todo.title}
+									</span>
+								{/if}
 							</label>
 							<button class="delete" onclick={() => removeTodo(todo.id)}>×</button>
 						</div>
@@ -306,6 +363,19 @@
 		gap: 0.5rem;
 		cursor: pointer;
 		flex: 1;
+	}
+
+	li label > span {
+		flex: 1;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+
+	li label > .edit-input {
+		flex: 1;
+		padding: 0.1rem 0.25rem;
+		font-size: inherit;
 	}
 
 	li.has-subtasks > .task-row > label > span {
