@@ -15,7 +15,7 @@ To recreate this project with the same configuration:
 
 ```sh
 # recreate this project
-npx sv@0.15.1 create --template minimal --types ts --add prettier eslint vitest="usages:unit,component" drizzle="database:sqlite+sqlite:better-sqlite3" mcp="ide:claude-code+setup:remote" --install yarn focused_todo
+npx sv@0.15.1 create --template minimal --types ts --add prettier vitest="usages:unit,component" --install yarn focustoo
 ```
 
 ## Developing

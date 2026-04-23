@@ -4,16 +4,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 
 export default defineConfig({
 	plugins: [sveltekit()],
-	optimizeDeps: {
-		exclude: ['better-sqlite3']
-	},
 	test: {
 		expect: { requireAssertions: true },
-		webServer: {
-			command: 'yarn test:dev',
-			port: 7002,
-			reuseExistingServer: !process.env.CI
-		},
 		projects: [
 			{
 				extends: './vite.config.ts',
