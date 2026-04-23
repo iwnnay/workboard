@@ -6,6 +6,11 @@ export default defineConfig({
 	plugins: [sveltekit()],
 	test: {
 		expect: { requireAssertions: true },
+		webServer: {
+			command: 'yarn test:dev',
+			port: 7005,
+			reuseExistingServer: !process.env.CI
+		},
 		projects: [
 			{
 				extends: './vite.config.ts',
