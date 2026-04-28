@@ -25,3 +25,26 @@ export const note = sqliteTable('note', {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
 });
+
+export const bookmarkFolder = sqliteTable('bookmark_folder', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	name: text('name').notNull(),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
+export const bookmark = sqliteTable('bookmark', {
+	id: text('id')
+		.primaryKey()
+		.$defaultFn(() => crypto.randomUUID()),
+	folderId: text('folder_id'),
+	name: text('name').notNull(),
+	url: text('url').notNull(),
+	description: text('description').notNull().default(''),
+	createdAt: text('created_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});

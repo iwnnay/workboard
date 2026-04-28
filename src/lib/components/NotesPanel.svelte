@@ -9,7 +9,6 @@
 	let openNoteIds = $state<string[]>([]);
 	let drafts = $state<Record<string, { title: string; content: string }>>({});
 
-	// Popup state
 	let showPopup = $state(false);
 	let searchQuery = $state('');
 	let popupLeft = $state(0);
@@ -124,7 +123,6 @@
 	}}
 />
 
-<!-- Search popup -->
 {#if showPopup}
 	<div
 		class="popup-backdrop"
@@ -230,7 +228,6 @@
 </div>
 
 <style>
-	/* ── Layout ─────────────────────────────────────────── */
 	.panel {
 		display: flex;
 		flex-direction: column;
@@ -242,8 +239,8 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.625rem 1rem;
-		border-bottom: 1px solid #111827;
-		background: #0a0f1a;
+		border-bottom: 1px solid var(--surface);
+		background: var(--bg-2);
 		flex-shrink: 0;
 	}
 
@@ -265,7 +262,7 @@
 		min-width: 320px;
 		display: flex;
 		flex-direction: column;
-		border-right: 1px solid #0d1117;
+		border-right: 1px solid var(--bg-2);
 		min-height: 0;
 	}
 
@@ -278,9 +275,9 @@
 		align-items: center;
 		gap: 0.5rem;
 		padding: 0.5rem 1rem;
-		border-bottom: 1px solid #0d1117;
+		border-bottom: 1px solid var(--bg-2);
 		flex-shrink: 0;
-		background: #060b12;
+		background: var(--bg-2);
 	}
 
 	.col-title {
@@ -289,13 +286,13 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-size: 0.8125rem;
-		color: #475569;
+		color: var(--text-dim);
 	}
 
 	.col-close {
 		background: none;
 		border: none;
-		color: #2d3748;
+		color: var(--border);
 		font-size: 1rem;
 		line-height: 1;
 		padding: 0 0.2rem;
@@ -304,7 +301,7 @@
 	}
 
 	.col-close:hover {
-		color: #ef4444;
+		color: var(--accent);
 	}
 
 	.col-editor {
@@ -320,17 +317,16 @@
 		display: flex;
 		align-items: center;
 		justify-content: center;
-		color: #1e293b;
+		color: var(--text-faint);
 		font-size: 0.875rem;
 		width: 100%;
 	}
 
-	/* ── Header controls ────────────────────────────────── */
 	.index-toggle {
 		background: none;
 		border: 1px solid transparent;
 		border-radius: 5px;
-		color: #475569;
+		color: var(--text-dim);
 		padding: 0.25rem 0.5rem;
 		font-size: 0.875rem;
 		transition:
@@ -340,14 +336,14 @@
 	}
 
 	.index-toggle:hover {
-		color: #94a3b8;
-		background: #1e293b;
+		color: var(--text-2);
+		background: var(--surface-2);
 	}
 
 	.index-toggle.active {
-		color: #ef4444;
-		background: #2d0a0a;
-		border-color: #7f1d1d;
+		color: var(--accent);
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
 	}
 
 	.panel-label {
@@ -355,15 +351,15 @@
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #334155;
+		color: var(--text-ghost);
 		flex: 1;
 	}
 
 	.new-btn {
 		background: none;
-		border: 1px solid #2d3748;
+		border: 1px solid var(--border);
 		border-radius: 5px;
-		color: #64748b;
+		color: var(--text-muted);
 		padding: 0.25rem 0.625rem;
 		font-size: 0.8125rem;
 		transition:
@@ -373,26 +369,24 @@
 	}
 
 	.new-btn:hover {
-		color: #ef4444;
-		border-color: #ef4444;
-		background: #2d0a0a;
+		color: var(--accent);
+		border-color: var(--accent);
+		background: var(--accent-bg);
 	}
 
-	/* ── Popup backdrop ─────────────────────────────────── */
 	.popup-backdrop {
 		position: fixed;
 		inset: 0;
 		z-index: 49;
 	}
 
-	/* ── Popup panel ────────────────────────────────────── */
 	.popup {
 		position: fixed;
 		z-index: 50;
 		width: 300px;
 		max-height: min(72vh, 520px);
-		background: #130d0d;
-		border: 1px solid #2d1a1a;
+		background: var(--bg);
+		border: 1px solid var(--border);
 		border-radius: 8px;
 		display: flex;
 		flex-direction: column;
@@ -404,27 +398,27 @@
 
 	.popup-search-wrap {
 		padding: 0.625rem;
-		border-bottom: 1px solid #1e1010;
+		border-bottom: 1px solid var(--border-2);
 		flex-shrink: 0;
 	}
 
 	.popup-search {
 		width: 100%;
-		background: #0f0808;
-		border: 1px solid #2d1a1a;
+		background: var(--bg-2);
+		border: 1px solid var(--border);
 		border-radius: 5px;
-		color: #e2e8f0;
+		color: var(--text);
 		padding: 0.4rem 0.625rem;
 		outline: none;
 		transition: border-color 0.15s;
 	}
 
 	.popup-search::placeholder {
-		color: #3d2020;
+		color: var(--text-ghost);
 	}
 
 	.popup-search:focus {
-		border-color: #ef4444;
+		border-color: var(--accent);
 	}
 
 	.popup-list {
@@ -440,7 +434,7 @@
 		padding: 0.5rem 0.875rem;
 		background: none;
 		border: none;
-		color: #4b2e2e;
+		color: var(--text-ghost);
 		text-align: left;
 		gap: 0.375rem;
 		transition:
@@ -449,12 +443,12 @@
 	}
 
 	.popup-item:hover {
-		background: #1e1010;
-		color: #94a3b8;
+		background: var(--surface);
+		color: var(--text-2);
 	}
 
 	.popup-item.is-open {
-		color: #fca5a5;
+		color: var(--accent);
 	}
 
 	.popup-item-title {
@@ -476,15 +470,15 @@
 	}
 
 	.popup-item:hover .popup-item-del {
-		color: #3d2020;
+		color: var(--text-ghost);
 	}
 
 	.popup-item:hover .popup-item-del:hover {
-		color: #ef4444;
+		color: var(--accent);
 	}
 
 	.popup-empty {
-		color: #2d1515;
+		color: var(--text-faint);
 		font-size: 0.8125rem;
 		padding: 0.75rem 0.875rem;
 		text-align: center;

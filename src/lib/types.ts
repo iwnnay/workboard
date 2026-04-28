@@ -13,3 +13,18 @@ export type Note = {
 	createdAt: string;
 	updatedAt: string;
 };
+
+export type BookmarkFolder = {
+	id: string;
+	name: string;
+	createdAt: string;
+};
+
+export type Bookmark = {
+	id: string;
+	folderId: string | null;
+	name: string;
+	url: string;
+	description: string;
+	createdAt: string;
+};

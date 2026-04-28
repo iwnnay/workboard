@@ -31,7 +31,7 @@
 	.time {
 		background: none;
 		border: none;
-		color: #475569;
+		color: var(--text-dim);
 		font-size: 0.8125rem;
 		font-family: 'Courier New', monospace;
 		letter-spacing: 0.04em;
@@ -40,12 +40,12 @@
 	}
 
 	.time:hover {
-		color: #64748b;
+		color: var(--text-muted);
 	}
 
 	.last-clicked {
 		font-size: 0.6875rem;
-		color: #334155;
+		color: var(--text-ghost);
 		margin-top: 0.2rem;
 	}
 </style>

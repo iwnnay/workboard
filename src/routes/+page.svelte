@@ -36,22 +36,23 @@
 		flex-direction: column;
 		gap: 0.75rem;
 		padding: 1.25rem;
-		border-right: 1px solid #1e293b;
+		background: var(--surface);
+		border-right: 1px solid var(--border);
 		overflow-y: auto;
 	}
 
 	.right-col {
 		overflow: hidden;
-		background: #080e1a;
+		background: var(--bg-2);
 	}
 
 	.reminder-btn {
 		width: 100%;
 		padding: 0.5rem 0.75rem;
-		background: #1e293b;
-		border: 1px solid #2d3748;
+		background: var(--surface);
+		border: 1px solid var(--border);
 		border-radius: 6px;
-		color: #64748b;
+		color: var(--text-muted);
 		text-align: left;
 		transition:
 			background 0.15s,
@@ -59,7 +60,7 @@
 	}
 
 	.reminder-btn:hover {
-		background: #263448;
-		color: #94a3b8;
+		background: var(--surface-2);
+		color: var(--text-2);
 	}
 </style>

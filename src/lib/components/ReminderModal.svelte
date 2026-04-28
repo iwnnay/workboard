@@ -70,7 +70,7 @@
 	.overlay {
 		position: fixed;
 		inset: 0;
-		background: rgba(0, 0, 0, 0.55);
+		background: rgba(0, 0, 0, 0.6);
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -78,8 +78,8 @@
 	}
 
 	.modal {
-		background: #1e293b;
-		border: 1px solid #334155;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
 		border-radius: 10px;
 		width: 480px;
 		max-width: 92vw;
@@ -92,13 +92,13 @@
 		align-items: center;
 		justify-content: space-between;
 		padding: 0.8rem 1rem;
-		border-bottom: 1px solid #2d3748;
+		border-bottom: 1px solid var(--border-2);
 	}
 
 	.title {
 		font-size: 0.8125rem;
 		font-weight: 500;
-		color: #64748b;
+		color: var(--text-muted);
 		text-transform: uppercase;
 		letter-spacing: 0.06em;
 	}
@@ -106,7 +106,7 @@
 	.close-btn {
 		background: none;
 		border: none;
-		color: #475569;
+		color: var(--text-dim);
 		font-size: 1.25rem;
 		line-height: 1;
 		padding: 0.125rem 0.25rem;
@@ -114,13 +114,13 @@
 	}
 
 	.close-btn:hover {
-		color: #e2e8f0;
+		color: var(--text);
 	}
 
 	textarea {
 		background: transparent;
 		border: none;
-		color: #cbd5e1;
+		color: var(--text-2);
 		padding: 1rem;
 		resize: none;
 		height: 220px;
@@ -129,7 +129,7 @@
 	}
 
 	textarea::placeholder {
-		color: #334155;
+		color: var(--text-ghost);
 	}
 
 	.modal-footer {
@@ -137,14 +137,14 @@
 		justify-content: flex-end;
 		gap: 0.5rem;
 		padding: 0.7rem 1rem;
-		border-top: 1px solid #2d3748;
+		border-top: 1px solid var(--border-2);
 	}
 
 	.clear-btn {
 		background: none;
-		border: 1px solid #2d3748;
+		border: 1px solid var(--border);
 		border-radius: 5px;
-		color: #475569;
+		color: var(--text-dim);
 		padding: 0.35rem 0.75rem;
 		font-size: 0.8125rem;
 		transition:
@@ -153,21 +153,24 @@
 	}
 
 	.clear-btn:hover {
-		color: #ef4444;
-		border-color: #ef4444;
+		color: var(--accent);
+		border-color: var(--accent);
 	}
 
 	.close-action {
-		background: #334155;
-		border: 1px solid #475569;
+		background: var(--surface);
+		border: 1px solid var(--border);
 		border-radius: 5px;
-		color: #e2e8f0;
+		color: var(--text-2);
 		padding: 0.35rem 0.875rem;
 		font-size: 0.8125rem;
-		transition: background 0.15s;
+		transition:
+			background 0.15s,
+			border-color 0.15s;
 	}
 
 	.close-action:hover {
-		background: #3d4f68;
+		background: var(--surface-2);
+		border-color: var(--text-dim);
 	}
 </style>

@@ -68,8 +68,8 @@
 	.title-input {
 		background: transparent;
 		border: none;
-		border-bottom: 1px solid #1e293b;
-		color: #e2e8f0;
+		border-bottom: 1px solid var(--border);
+		color: var(--text);
 		font-size: 1rem;
 		font-weight: 600;
 		padding: 0.25rem 0 0.5rem;
@@ -78,17 +78,17 @@
 	}
 
 	.title-input::placeholder {
-		color: #1e293b;
+		color: var(--text-faint);
 	}
 
 	.title-input:focus {
-		border-bottom-color: #ef4444;
+		border-bottom-color: var(--accent);
 	}
 
 	.content-input {
 		background: transparent;
 		border: none;
-		color: #94a3b8;
+		color: var(--text-2);
 		flex: 1;
 		line-height: 1.7;
 		outline: none;
@@ -97,6 +97,6 @@
 	}
 
 	.content-input::placeholder {
-		color: #1e293b;
+		color: var(--text-faint);
 	}
 </style>

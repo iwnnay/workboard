@@ -107,14 +107,14 @@
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #334155;
+		color: var(--text-ghost);
 	}
 
 	.add-input {
-		background: #111827;
-		border: 1px solid #1e293b;
+		background: var(--surface);
+		border: 1px solid var(--border-2);
 		border-radius: 6px;
-		color: #e2e8f0;
+		color: var(--text);
 		padding: 0.5rem 0.625rem;
 		outline: none;
 		transition: border-color 0.15s;
@@ -122,11 +122,11 @@
 	}
 
 	.add-input::placeholder {
-		color: #334155;
+		color: var(--text-ghost);
 	}
 
 	.add-input:focus {
-		border-color: #ef4444;
+		border-color: var(--accent);
 	}
 
 	.list {
@@ -146,7 +146,7 @@
 	}
 
 	.item:hover {
-		background: #111827;
+		background: var(--surface);
 	}
 
 	.item-label {
@@ -155,7 +155,7 @@
 		gap: 0.5rem;
 		flex: 1;
 		cursor: pointer;
-		color: #cbd5e1;
+		color: var(--text-2);
 		min-width: 0;
 	}
 
@@ -166,7 +166,7 @@
 	}
 
 	.check {
-		accent-color: #ef4444;
+		accent-color: var(--accent);
 		width: 13px;
 		height: 13px;
 		flex-shrink: 0;
@@ -174,7 +174,7 @@
 
 	.item.done .item-label span {
 		text-decoration: line-through;
-		color: #334155;
+		color: var(--text-ghost);
 	}
 
 	.del {
@@ -189,15 +189,15 @@
 	}
 
 	.item:hover .del {
-		color: #334155;
+		color: var(--text-ghost);
 	}
 
 	.item:hover .del:hover {
-		color: #ef4444;
+		color: var(--accent);
 	}
 
 	.empty {
-		color: #1e293b;
+		color: var(--text-faint);
 		font-size: 0.8125rem;
 		padding: 0.375rem 0.4rem;
 	}
@@ -205,7 +205,7 @@
 	.completed-group {
 		margin-top: 0.25rem;
 		padding-top: 0.625rem;
-		border-top: 1px solid #111827;
+		border-top: 1px solid var(--surface);
 		display: flex;
 		flex-direction: column;
 		gap: 0.375rem;
@@ -216,6 +216,6 @@
 		font-weight: 600;
 		text-transform: uppercase;
 		letter-spacing: 0.08em;
-		color: #1e293b;
+		color: var(--text-faint);
 	}
 </style>
