@@ -5,7 +5,8 @@
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard' },
-		{ href: '/bookmarks', label: 'Bookmarks' }
+		{ href: '/bookmarks', label: 'Bookmarks' },
+		{ href: '/diff', label: 'Diff' }
 	];
 
 	function close() {

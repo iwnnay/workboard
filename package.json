@@ -4,7 +4,8 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"dev": "mkdir -p logs && vite dev --port 7010 2>&1 | tee logs/dev.log",
+		"dev": "mkdir -p logs && nohup vite dev --port 7010 > logs/dev.log 2>&1 & echo \"Dev server on :7010 (PID $!). Logs: tail -f logs/dev.log\"",
+		"dev:stop": "kill $(lsof -ti:7010) 2>/dev/null && echo 'Dev server stopped' || echo 'Nothing on port 7010'",
 		"test:dev": "vite dev --port 7002",
 		"build": "vite build",
 		"preview": "vite preview",
