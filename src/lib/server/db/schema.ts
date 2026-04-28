@@ -1,50 +1,27 @@
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
-export const task = sqliteTable('task', {
+export const todo = sqliteTable('todo', {
 	id: text('id')
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
-	title: text('title').notNull(),
+	text: text('text').notNull(),
 	completed: integer('completed', { mode: 'boolean' }).notNull().default(false),
-	priority: integer('priority').notNull().default(1),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.$defaultFn(() => new Date())
+	completedAt: text('completed_at'),
+	createdAt: text('created_at')
 		.notNull()
-});
-
-export const subtask = sqliteTable('subtask', {
-	id: text('id')
-		.primaryKey()
-		.$defaultFn(() => crypto.randomUUID()),
-	taskId: text('task_id')
-		.notNull()
-		.references(() => task.id, { onDelete: 'cascade' }),
-	title: text('title').notNull(),
-	completed: integer('completed', { mode: 'boolean' }).notNull().default(false)
+		.$defaultFn(() => new Date().toISOString())
 });
 
 export const note = sqliteTable('note', {
 	id: text('id')
 		.primaryKey()
 		.$defaultFn(() => crypto.randomUUID()),
-	title: text('title').notNull(),
-	content: text('content').notNull(),
-	orderIndex: integer('order_index').notNull().default(0),
-	createdAt: integer('created_at', { mode: 'timestamp' })
-		.$defaultFn(() => new Date())
-		.notNull(),
-	updatedAt: integer('updated_at', { mode: 'timestamp' })
-		.$defaultFn(() => new Date())
+	title: text('title').notNull().default(''),
+	content: text('content').notNull().default(''),
+	createdAt: text('created_at')
 		.notNull()
-});
-
-export const calendarEvent = sqliteTable('calendar_event', {
-	id: text('id')
-		.primaryKey()
-		.$defaultFn(() => crypto.randomUUID()),
-	title: text('title').notNull(),
-	startTime: integer('start_time', { mode: 'timestamp' }).notNull(),
-	endTime: integer('end_time', { mode: 'timestamp' }).notNull(),
-	location: text('location'),
-	isAllDay: integer('is_all_day', { mode: 'boolean' }).notNull().default(false)
+		.$defaultFn(() => new Date().toISOString()),
+	updatedAt: text('updated_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
 });

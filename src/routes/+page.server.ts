@@ -1,47 +1,19 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { task, note, calendarEvent, subtask } from '$lib/server/db/schema';
-import { gt, asc, sql } from 'drizzle-orm';
-import { isAuthenticated, getCalendarEvents } from '$lib/server/outlook';
+import { todo, note } from '$lib/server/db/schema';
+import { and, asc, desc, eq, isNotNull, lt } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
-	const todos = db.select().from(task).all();
-	const allSubtasks = db.select().from(subtask).all();
-	const notes = db.select().from(note).orderBy(asc(note.orderIndex)).all();
+	const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
 
-	const outlookEvents = isAuthenticated()
-		? await getCalendarEvents(new Date(), new Date(Date.now() + 7 * 24 * 60 * 60 * 1000))
-		: [];
+	await db
+		.delete(todo)
+		.where(and(eq(todo.completed, true), isNotNull(todo.completedAt), lt(todo.completedAt, threeDaysAgo)));
 
-	const dbEvents = db
-		.select()
-		.from(calendarEvent)
-		.where(gt(calendarEvent.startTime, new Date()))
-		.orderBy(asc(calendarEvent.startTime))
-		.all();
+	const [todos, notes] = await Promise.all([
+		db.select().from(todo).orderBy(asc(todo.createdAt)),
+		db.select().from(note).orderBy(desc(note.updatedAt))
+	]);
 
-	const events = [...outlookEvents, ...dbEvents].sort(
-		(a: any, b: any) =>
-			new Date(a.start?.dateTime || a.startTime).getTime() -
-			new Date(b.start?.dateTime || b.startTime).getTime()
-	);
-
-	const todosWithSubtasks = todos.map((t) => ({
-		...t,
-		subtasks: allSubtasks.filter((s) => s.taskId === t.id)
-	}));
-
-	return {
-		todos: todosWithSubtasks,
-		notes: notes.map((n) => ({ ...n, updatedAt: n.updatedAt })),
-		events: events.map((e: any) => ({
-			id: e.id || crypto.randomUUID(),
-			title: e.subject || e.title,
-			startTime: e.start?.dateTime ? new Date(e.start.dateTime) : e.startTime,
-			endTime: e.end?.dateTime ? new Date(e.end.dateTime) : e.endTime,
-			location: e.location?.displayName || e.location,
-			isAllDay: e.isAllDay
-		})),
-		isAuthenticated: isAuthenticated()
-	};
+	return { todos, notes };
 };

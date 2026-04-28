@@ -1,530 +1,221 @@
 <script lang="ts">
-	interface Subtask {
-		id: string;
-		taskId: string;
-		title: string;
-		completed: boolean;
-	}
+	import type { Todo } from '$lib/types';
+	import { untrack } from 'svelte';
 
-	interface Todo {
-		id: string;
-		title: string;
-		completed: boolean;
-		priority: number;
-		subtasks: Subtask[];
-	}
+	let { initialTodos }: { initialTodos: Todo[] } = $props();
 
-	interface Props {
-		todos: Todo[];
-	}
+	let todos = $state<Todo[]>(untrack(() => initialTodos));
+	let newText = $state('');
+	let inputEl: HTMLInputElement;
 
-	let { todos }: Props = $props();
-
-	let completedTodos = $derived(todos.filter((t) => t.completed));
-	let activeTodos = $derived(todos.filter((t) => !t.completed));
-
-	let newTodoTitle = $state('');
-	let expandedTasks = $state<Set<string>>(
-		new Set(
-			typeof sessionStorage !== 'undefined'
-				? JSON.parse(sessionStorage.getItem('expandedTasks') || '[]')
-				: []
-		)
+	const active = $derived(todos.filter((t) => !t.completed));
+	const completed = $derived(
+		todos
+			.filter((t) => t.completed)
+			.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))
 	);
-	let newSubtaskTitles = $state<Record<string, string>>({});
-	let mainInputEl = $state<HTMLInputElement | null>(null);
-	let subtaskInputEls = $state<Record<string, HTMLInputElement>>({});
-	let focusedTaskId = $state<string | null>(
-		typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('focusSubtaskTaskId') : null
-	);
-	let editingTaskId = $state<string | null>(null);
-	let editingTitle = $state('');
-	if (focusedTaskId && typeof window !== 'undefined') {
-		sessionStorage.removeItem('focusSubtaskTaskId');
-		$effect(() => {
-			if (focusedTaskId && subtaskInputEls[focusedTaskId]) {
-				subtaskInputEls[focusedTaskId]?.focus();
-			}
-		});
-	}
 
-	function toggleExpand(taskId: string) {
-		const newSet = new Set(expandedTasks);
-		if (newSet.has(taskId)) {
-			newSet.delete(taskId);
-		} else {
-			newSet.add(taskId);
-		}
-		expandedTasks = newSet;
-		if (typeof sessionStorage !== 'undefined') {
-			sessionStorage.setItem('expandedTasks', JSON.stringify([...newSet]));
-		}
-	}
-
-	function isExpanded(taskId: string) {
-		return expandedTasks.has(taskId);
-	}
-
-	function hasSubtasks(todo: Todo) {
-		return todo.subtasks && todo.subtasks.length > 0;
-	}
-
-	function allSubtasksCompleted(todo: Todo) {
-		return todo.subtasks.length > 0 && todo.subtasks.every((s) => s.completed);
-	}
-
-	async function addTodo(e: Event) {
-		e.preventDefault();
-		if (!newTodoTitle.trim()) return;
-
-		await fetch('/api/todos', {
+	async function addTodo() {
+		const text = newText.trim();
+		if (!text) return;
+		const res = await fetch('/api/todos', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title: newTodoTitle })
+			body: JSON.stringify({ text })
 		});
-
-		newTodoTitle = '';
-		window.location.reload();
+		const created: Todo = await res.json();
+		todos = [...todos, created];
+		newText = '';
+		inputEl?.focus();
 	}
 
-	async function toggleTodo(id: string, completed: boolean) {
-		await fetch(`/api/todos/${id}`, {
+	async function toggleTodo(item: Todo) {
+		const nowCompleted = !item.completed;
+		const res = await fetch(`/api/todos/${item.id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ completed })
+			body: JSON.stringify({
+				completed: nowCompleted,
+				completedAt: nowCompleted ? new Date().toISOString() : null
+			})
 		});
-		window.location.reload();
+		const updated: Todo = await res.json();
+		todos = todos.map((t) => (t.id === updated.id ? updated : t));
 	}
 
-	async function removeTodo(id: string) {
+	async function deleteTodo(id: string) {
 		await fetch(`/api/todos/${id}`, { method: 'DELETE' });
-		window.location.reload();
-	}
-
-	async function addSubtask(e: Event, taskId: string) {
-		e.preventDefault();
-		const title = newSubtaskTitles[taskId];
-		if (!title?.trim()) return;
-
-		await fetch('/api/todos/subtasks', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ taskId, title })
-		});
-
-		newSubtaskTitles[taskId] = '';
-		sessionStorage.setItem('focusSubtaskTaskId', taskId);
-		window.location.reload();
-	}
-
-	async function toggleSubtask(id: string, completed: boolean) {
-		await fetch(`/api/todos/subtasks/${id}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ completed })
-		});
-		window.location.reload();
-	}
-
-	async function removeSubtask(id: string) {
-		await fetch(`/api/todos/subtasks/${id}`, { method: 'DELETE' });
-		window.location.reload();
-	}
-
-	function startEditing(taskId: string, title: string) {
-		editingTaskId = taskId;
-		editingTitle = title;
-	}
-
-	async function finishEditing() {
-		if (!editingTaskId || !editingTitle.trim()) {
-			editingTaskId = null;
-			return;
-		}
-		await fetch(`/api/todos/${editingTaskId}`, {
-			method: 'PATCH',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ title: editingTitle })
-		});
-		editingTaskId = null;
-		window.location.reload();
-	}
-
-	function handleKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			finishEditing();
-		} else if (e.key === 'Escape') {
-			editingTaskId = null;
-		}
+		todos = todos.filter((t) => t.id !== id);
 	}
 </script>
 
-<div class="todo-list">
-	<h2>Tasks</h2>
+<section class="section">
+	<h3 class="section-label">To Do</h3>
 
-	<form onsubmit={addTodo}>
-		<input
-			type="text"
-			placeholder="Add a task..."
-			bind:value={newTodoTitle}
-			bind:this={mainInputEl}
-		/>
-	</form>
+	<input
+		bind:this={inputEl}
+		bind:value={newText}
+		onkeydown={(e) => e.key === 'Enter' && addTodo()}
+		placeholder="Add new item..."
+		class="add-input"
+	/>
 
-	<ul>
-		{#each activeTodos as todo (todo.id)}
-			<li class:has-subtasks={hasSubtasks(todo)}>
-				<div class="task-row">
-					{#if hasSubtasks(todo)}
-						<button
-							class="expand-btn"
-							class:expanded={isExpanded(todo.id)}
-							onclick={() => toggleExpand(todo.id)}
-							aria-label={isExpanded(todo.id) ? 'Collapse' : 'Expand'}
-						>
-							{isExpanded(todo.id) ? '▼' : '▶'}
-						</button>
-					{/if}
-					<label>
-						<input
-							type="checkbox"
-							checked={allSubtasksCompleted(todo)}
-							onchange={() => toggleTodo(todo.id, !allSubtasksCompleted(todo))}
-						/>
-						{#if editingTaskId === todo.id}
-							<input
-								type="text"
-								class="edit-input"
-								bind:value={editingTitle}
-								onblur={finishEditing}
-								onkeydown={handleKeydown}
-							/>
-						{:else}
-							<span
-								ondblclick={() => startEditing(todo.id, todo.title)}
-							>
-								{todo.title}
-							</span>
-						{/if}
-					</label>
-					<button
-						class="add-subtask-btn"
-						onclick={() => {
-							newSubtaskTitles[todo.id] = '';
-							toggleExpand(todo.id);
-						}}>+</button
-					>
-					<button class="delete" onclick={() => removeTodo(todo.id)}>×</button>
-				</div>
-				{#if isExpanded(todo.id)}
-					<div class="subtask-container">
-						<div class="subtask-header">
-							<form class="subtask-form" onsubmit={(e) => addSubtask(e, todo.id)}>
-								<input
-									type="text"
-									placeholder="Add subtask..."
-									bind:value={newSubtaskTitles[todo.id]}
-									bind:this={subtaskInputEls[todo.id]}
-								/>
-							</form>
-						</div>
-						{#if todo.subtasks.length > 0}
-							<ul class="subtask-list">
-								{#each todo.subtasks as subtask (subtask.id)}
-									<li class="subtask-item">
-										<label>
-											<input
-												type="checkbox"
-												checked={subtask.completed}
-												onchange={() => toggleSubtask(subtask.id, !subtask.completed)}
-											/>
-											<span>{subtask.title}</span>
-										</label>
-										<button class="delete" onclick={() => removeSubtask(subtask.id)}>×</button>
-									</li>
-								{/each}
-							</ul>
-						{/if}
-					</div>
-				{/if}
+	<ul class="list">
+		{#each active as item (item.id)}
+			<li class="item">
+				<label class="item-label">
+					<input class="check" type="checkbox" onchange={() => toggleTodo(item)} />
+					<span>{item.text}</span>
+				</label>
+				<button class="del" onclick={() => deleteTodo(item.id)} aria-label="Delete">×</button>
 			</li>
 		{/each}
+		{#if active.length === 0}
+			<li class="empty">Nothing pending.</li>
+		{/if}
 	</ul>
 
-	{#if completedTodos.length > 0}
-		<div class="completed-section">
-			<h3>Completed</h3>
-			<ul>
-				{#each completedTodos as todo (todo.id)}
-					<li class="completed">
-						<div class="task-row">
-							{#if hasSubtasks(todo)}
-								<button
-									class="expand-btn"
-									class:expanded={isExpanded(todo.id)}
-									onclick={() => toggleExpand(todo.id)}
-									aria-label={isExpanded(todo.id) ? 'Collapse' : 'Expand'}
-								>
-									{isExpanded(todo.id) ? '▼' : '▶'}
-								</button>
-							{/if}
-							<label>
-								<input type="checkbox" checked={true} onchange={() => toggleTodo(todo.id, false)} />
-								{#if editingTaskId === todo.id}
-									<input
-										type="text"
-										class="edit-input"
-										bind:value={editingTitle}
-										onblur={finishEditing}
-										onkeydown={handleKeydown}
-									/>
-								{:else}
-									<span
-										ondblclick={() => startEditing(todo.id, todo.title)}
-									>
-										{todo.title}
-									</span>
-								{/if}
-							</label>
-							<button class="delete" onclick={() => removeTodo(todo.id)}>×</button>
-						</div>
-						{#if isExpanded(todo.id) && todo.subtasks.length > 0}
-							<div class="subtask-container">
-								<ul class="subtask-list">
-									{#each todo.subtasks as subtask (subtask.id)}
-										<li class="subtask-item">
-											<label>
-												<input
-													type="checkbox"
-													checked={subtask.completed}
-													onchange={() => toggleSubtask(subtask.id, !subtask.completed)}
-												/>
-												<span>{subtask.title}</span>
-											</label>
-											<button class="delete" onclick={() => removeSubtask(subtask.id)}>×</button>
-										</li>
-									{/each}
-								</ul>
-							</div>
-						{/if}
+	{#if completed.length > 0}
+		<div class="completed-group">
+			<h4 class="completed-label">Completed</h4>
+			<ul class="list">
+				{#each completed as item (item.id)}
+					<li class="item done">
+						<label class="item-label">
+							<input class="check" type="checkbox" checked onchange={() => toggleTodo(item)} />
+							<span>{item.text}</span>
+						</label>
+						<button class="del" onclick={() => deleteTodo(item.id)} aria-label="Delete">×</button>
 					</li>
 				{/each}
 			</ul>
 		</div>
 	{/if}
-</div>
+</section>
 
 <style>
-	.todo-list {
-		background: white;
-		border-radius: 8px;
-		padding: 1rem;
-		box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-	}
-
-	h2 {
-		font-size: 1rem;
-		font-weight: 600;
-		margin-bottom: 1rem;
-	}
-
-	input[type='text'] {
-		width: 100%;
-		padding: 0.5rem;
-		border: 1px solid #ddd;
-		border-radius: 4px;
-		font-size: 0.9rem;
-	}
-
-	input[type='text']:focus {
-		outline: none;
-		border-color: #666;
-	}
-
-	ul {
-		list-style: none;
-		margin-top: 1rem;
-	}
-
-	li {
+	.section {
+		flex: 1;
 		display: flex;
 		flex-direction: column;
-		padding: 0.5rem 0;
-		border-bottom: 1px solid #eee;
+		gap: 0.625rem;
+		min-height: 0;
 	}
 
-	li:last-child {
-		border-bottom: none;
+	.section-label {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #334155;
 	}
 
-	li label {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		cursor: pointer;
-		flex: 1;
-	}
-
-	li label > span {
-		flex: 1;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	li label > .edit-input {
-		flex: 1;
-		padding: 0.1rem 0.25rem;
-		font-size: inherit;
-	}
-
-	li.has-subtasks > .task-row > label > span {
-		font-weight: 500;
-	}
-
-	.task-row {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		width: 100%;
-	}
-
-	.subtask-container {
-		width: 100%;
-		margin-top: 0.5rem;
-		padding-left: 1.5rem;
-		border-left: 2px solid #e0e0e0;
-	}
-
-	.subtask-header {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-bottom: 0.5rem;
-	}
-
-	.expand-btn {
-		background: none;
-		border: none;
-		font-size: 0.7rem;
-		cursor: pointer;
-		color: #666;
-		padding: 0.25rem;
-		width: 1.25rem;
-		height: 1.25rem;
-		display: flex;
-		align-items: center;
-		justify-content: center;
-	}
-
-	.expand-btn:hover {
-		background: #f0f0f0;
-		border-radius: 3px;
-	}
-
-	.add-subtask-btn {
-		background: none;
-		border: none;
-		font-size: 1rem;
-		cursor: pointer;
-		color: #999;
-		padding: 0 0.25rem;
-	}
-
-	.add-subtask-btn:hover {
-		color: #333;
-	}
-
-	.subtask-container {
-		width: 100%;
-		margin-top: 0.5rem;
-		padding-left: 1.5rem;
-		border-left: 2px solid #e0e0e0;
-	}
-
-	.subtask-form {
-		margin-bottom: 0.25rem;
-	}
-
-	.subtask-form input {
-		width: 100%;
-		padding: 0.35rem;
-		border: 1px solid #eee;
-		border-radius: 4px;
-		font-size: 0.85rem;
-	}
-
-	.subtask-form input:focus {
+	.add-input {
+		background: #111827;
+		border: 1px solid #1e293b;
+		border-radius: 6px;
+		color: #e2e8f0;
+		padding: 0.5rem 0.625rem;
 		outline: none;
-		border-color: #999;
+		transition: border-color 0.15s;
+		width: 100%;
 	}
 
-	.subtask-list {
-		margin: 0;
-		padding: 0;
+	.add-input::placeholder {
+		color: #334155;
+	}
+
+	.add-input:focus {
+		border-color: #ef4444;
+	}
+
+	.list {
 		list-style: none;
-	}
-
-	.subtask-item {
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
+		gap: 1px;
+	}
+
+	.item {
+		display: flex;
 		align-items: center;
-		justify-content: space-between;
-		padding: 0.35rem 0;
-		border-bottom: 1px solid #f5f5f5;
+		gap: 0.375rem;
+		padding: 0.3rem 0.4rem;
+		border-radius: 5px;
+		transition: background 0.1s;
 	}
 
-	.subtask-item:last-child {
-		border-bottom: none;
+	.item:hover {
+		background: #111827;
 	}
 
-	.subtask-item > label {
+	.item-label {
 		display: flex;
 		align-items: center;
 		gap: 0.5rem;
 		flex: 1;
+		cursor: pointer;
+		color: #cbd5e1;
 		min-width: 0;
 	}
 
-	.subtask-item > label > span {
-		font-size: 0.9rem;
+	.item-label span {
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
 
-	li.completed span {
+	.check {
+		accent-color: #ef4444;
+		width: 13px;
+		height: 13px;
+		flex-shrink: 0;
+	}
+
+	.item.done .item-label span {
 		text-decoration: line-through;
-		color: #999;
+		color: #334155;
 	}
 
-	.completed-section {
-		margin-top: 1.5rem;
-		padding-top: 1rem;
-		border-top: 1px solid #eee;
-	}
-
-	.completed-section h3 {
-		font-size: 0.85rem;
-		font-weight: 500;
-		color: #666;
-		margin-bottom: 0.5rem;
-	}
-
-	.completed-section ul {
-		margin-top: 0;
-	}
-
-	.delete {
+	.del {
 		background: none;
 		border: none;
-		font-size: 1.25rem;
-		cursor: pointer;
-		color: #999;
-		padding: 0 0.25rem;
+		color: transparent;
+		font-size: 1rem;
+		line-height: 1;
+		padding: 0 0.2rem;
+		flex-shrink: 0;
+		transition: color 0.1s;
 	}
 
-	.delete:hover {
-		color: #f00;
+	.item:hover .del {
+		color: #334155;
+	}
+
+	.item:hover .del:hover {
+		color: #ef4444;
+	}
+
+	.empty {
+		color: #1e293b;
+		font-size: 0.8125rem;
+		padding: 0.375rem 0.4rem;
+	}
+
+	.completed-group {
+		margin-top: 0.25rem;
+		padding-top: 0.625rem;
+		border-top: 1px solid #111827;
+		display: flex;
+		flex-direction: column;
+		gap: 0.375rem;
+	}
+
+	.completed-label {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: #1e293b;
 	}
 </style>

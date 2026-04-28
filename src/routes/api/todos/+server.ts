@@ -1,28 +1,20 @@
-import { json, error } from '@sveltejs/kit';
+import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
-import { task } from '$lib/server/db/schema';
+import { todo } from '$lib/server/db/schema';
+import { and, asc, eq, isNotNull, lt } from 'drizzle-orm';
 
 export async function GET() {
-	try {
-		const todos = db.select().from(task).all();
-		return json(todos);
-	} catch (e) {
-		console.error('GET todos error:', e);
-		throw error(500, 'Failed to fetch todos');
-	}
+	const threeDaysAgo = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+	await db
+		.delete(todo)
+		.where(and(eq(todo.completed, true), isNotNull(todo.completedAt), lt(todo.completedAt, threeDaysAgo)));
+
+	const todos = await db.select().from(todo).orderBy(asc(todo.createdAt));
+	return json(todos);
 }
 
 export async function POST({ request }) {
-	try {
-		const body = await request.json();
-		const { title } = body;
-		if (!title) {
-			throw error(400, 'Title is required');
-		}
-		const newTodo = db.insert(task).values({ title }).returning().get();
-		return json(newTodo, { status: 201 });
-	} catch (e: any) {
-		console.error('POST todo error:', e);
-		throw error(500, e.message || 'Failed to create todo');
-	}
+	const { text } = await request.json();
+	const [created] = await db.insert(todo).values({ text }).returning();
+	return json(created);
 }

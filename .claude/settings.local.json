@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__svelte__list-sections",
+      "Bash(xargs -I{} sh -c 'echo \"=== {} ===\" && cat {}')",
+      "mcp__svelte__svelte-autofixer",
+      "Bash(yarn db:push)",
+      "Bash(yarn db:seed *)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "svelte"
+  ]
+}

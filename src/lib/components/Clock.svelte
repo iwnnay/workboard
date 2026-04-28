@@ -1,61 +1,51 @@
 <script lang="ts">
-	interface Props {
-		timezone: string;
-		label: string;
-		large?: boolean;
-	}
-
-	let { timezone, label, large = false }: Props = $props();
-
-	let now = $state(new Date());
+	let time = $state(new Date());
+	let lastClicked = $state<Date | null>(null);
 
 	$effect(() => {
 		const interval = setInterval(() => {
-			now = new Date();
+			time = new Date();
 		}, 1000);
 		return () => clearInterval(interval);
 	});
 
-	const time = $derived(
-		now.toLocaleTimeString('en-US', {
-			timeZone: timezone,
-			hour: '2-digit',
-			minute: '2-digit',
-			second: '2-digit',
-			hour12: true
-		})
-	);
+	function fmt(d: Date) {
+		return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+	}
 </script>
 
-<div class="clock" class:large>
-	<span class="time">{time}</span>
-	<span class="label">{label}</span>
+<div class="clock">
+	<button class="time" onclick={() => (lastClicked = new Date())}>
+		{fmt(time)}
+	</button>
+	{#if lastClicked}
+		<p class="last-clicked">Last clicked at: {fmt(lastClicked)}</p>
+	{/if}
 </div>
 
 <style>
 	.clock {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.25rem;
+		padding-bottom: 0.25rem;
 	}
 
 	.time {
-		font-size: 1.5rem;
-		font-weight: 600;
-		font-variant-numeric: tabular-nums;
-		letter-spacing: -0.02em;
+		background: none;
+		border: none;
+		color: #475569;
+		font-size: 0.8125rem;
+		font-family: 'Courier New', monospace;
+		letter-spacing: 0.04em;
+		padding: 0;
+		transition: color 0.15s;
 	}
 
-	.clock.large .time {
-		font-size: 3rem;
-		font-weight: 700;
+	.time:hover {
+		color: #64748b;
 	}
 
-	.label {
-		font-size: 0.75rem;
-		text-transform: uppercase;
-		letter-spacing: 0.1em;
-		color: #666;
+	.last-clicked {
+		font-size: 0.6875rem;
+		color: #334155;
+		margin-top: 0.2rem;
 	}
 </style>

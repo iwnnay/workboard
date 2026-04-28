@@ -1,58 +1,65 @@
 <script lang="ts">
 	import Clock from '$lib/components/Clock.svelte';
+	import ReminderModal from '$lib/components/ReminderModal.svelte';
 	import TodoList from '$lib/components/TodoList.svelte';
-	import NotesAside from '$lib/components/NotesAside.svelte';
+	import NotesPanel from '$lib/components/NotesPanel.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	let reminderOpen = $state(false);
 </script>
 
-<aside class="left-aside"></aside>
+<div class="dashboard">
+	<aside class="left-col">
+		<Clock />
+		<button class="reminder-btn" onclick={() => (reminderOpen = true)}>Reminder</button>
+		<TodoList initialTodos={data.todos} />
+	</aside>
 
-<main class="center">
-	<div class="clocks">
-		<Clock timezone="America/Chicago" label="Central Time" large />
-		<Clock timezone="America/New_York" label="Eastern Time" />
-	</div>
+	<main class="right-col">
+		<NotesPanel initialNotes={data.notes} />
+	</main>
+</div>
 
-	<div class="todo-container">
-		<TodoList todos={data.todos} />
-	</div>
-</main>
-
-<aside class="right-aside">
-	<NotesAside notes={data.notes} />
-</aside>
+<ReminderModal bind:open={reminderOpen} />
 
 <style>
-	.left-aside {
-		grid-area: left;
-		padding: 1rem;
+	.dashboard {
+		display: grid;
+		grid-template-columns: 300px 1fr;
+		height: 100dvh;
+		overflow: hidden;
 	}
 
-	.center {
-		grid-area: center;
-		padding: 2rem;
+	.left-col {
 		display: flex;
 		flex-direction: column;
-		align-items: center;
-		gap: 2rem;
+		gap: 0.75rem;
+		padding: 1.25rem;
+		border-right: 1px solid #1e293b;
+		overflow-y: auto;
 	}
 
-	.clocks {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 0.5rem;
+	.right-col {
+		overflow: hidden;
+		background: #080e1a;
 	}
 
-	.todo-container {
+	.reminder-btn {
 		width: 100%;
-		max-width: 500px;
+		padding: 0.5rem 0.75rem;
+		background: #1e293b;
+		border: 1px solid #2d3748;
+		border-radius: 6px;
+		color: #64748b;
+		text-align: left;
+		transition:
+			background 0.15s,
+			color 0.15s;
 	}
 
-	.right-aside {
-		grid-area: right;
-		padding: 1rem 0.5rem 1rem 1rem;
+	.reminder-btn:hover {
+		background: #263448;
+		color: #94a3b8;
 	}
 </style>

@@ -6,42 +6,51 @@
 
 <svelte:head>
 	<link rel="icon" href={favicon} />
-	<title>Focused Todo</title>
+	<title>Workboard</title>
 </svelte:head>
 
-<div class="app">
-	{@render children()}
-</div>
+{@render children()}
 
 <style>
-	:global(*) {
+	:global(*, *::before, *::after) {
 		box-sizing: border-box;
 		margin: 0;
 		padding: 0;
 	}
 
 	:global(body) {
+		background: #0f172a;
+		color: #e2e8f0;
 		font-family:
 			system-ui,
 			-apple-system,
+			'Segoe UI',
 			sans-serif;
-		background: #f5f5f5;
-		color: #333;
+		font-size: 14px;
+		line-height: 1.5;
 	}
 
-	.app {
-		display: grid;
-		grid-template-columns: 1fr 280px;
-		grid-template-areas: 'center right';
-		min-height: 100vh;
+	:global(button) {
+		cursor: pointer;
+		font-family: inherit;
+		font-size: inherit;
 	}
 
-	@media (max-width: 768px) {
-		.app {
-			grid-template-columns: 1fr;
-			grid-template-areas:
-				'center'
-				'right';
-		}
+	:global(input, textarea) {
+		font-family: inherit;
+		font-size: inherit;
+	}
+
+	:global(::-webkit-scrollbar) {
+		width: 5px;
+	}
+
+	:global(::-webkit-scrollbar-track) {
+		background: transparent;
+	}
+
+	:global(::-webkit-scrollbar-thumb) {
+		background: #334155;
+		border-radius: 3px;
 	}
 </style>
