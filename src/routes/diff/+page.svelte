@@ -1,13 +1,32 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { DiffFile } from '$lib/server/git';
+	import type { Project } from '$lib/types';
+	import { untrack } from 'svelte';
 
 	let { data }: { data: PageData } = $props();
 
+	// Mutable local mirrors of server state
+	let projects = $state<Project[]>(untrack(() => data.projects));
+	let rangeInput = $state(untrack(() => data.range));
+	let selectedProjectId = $state(untrack(() => data.projectId));
+
+	// Dropdown UI
+	let loading = $state(false);
+	let dropdownOpen = $state(false);
+	let newProjectPath = $state('');
+	let addPathInput = $state<HTMLInputElement | null>(null);
+
+	// File list UI
 	let filterQuery = $state('');
 	let _selectedPath = $state<string | null>(null);
 
-	// Keep selection valid across data reloads; fall back to first file
+	// ── Derived ──────────────────────────────────────────────
+
+	const selectedProject = $derived(
+		selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null
+	);
+
 	const selectedPath = $derived(
 		_selectedPath && data.files.find((f) => f.path === _selectedPath)
 			? _selectedPath
@@ -24,9 +43,56 @@
 		data.files.find((f) => f.path === selectedPath) ?? null
 	);
 
+	// ── Navigation ───────────────────────────────────────────
+
+	function navigate(projectId: string, range: string) {
+		const params = new URLSearchParams({ range });
+		if (projectId) params.set('projectId', projectId);
+		loading = true;
+		window.location.href = `/diff?${params.toString()}`;
+	}
+
+	function selectProject(id: string) {
+		selectedProjectId = id;
+		dropdownOpen = false;
+		navigate(id, rangeInput);
+	}
+
+	// ── Projects CRUD ────────────────────────────────────────
+
+	async function addProject() {
+		const path = newProjectPath.trim();
+		if (!path) return;
+		const name = deriveName(path);
+		const res = await fetch('/api/projects', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ name, path })
+		});
+		const created: Project = await res.json();
+		projects = [...projects, created].sort((a, b) => a.name.localeCompare(b.name));
+		newProjectPath = '';
+		selectProject(created.id);
+	}
+
+	async function deleteProject(id: string, e: MouseEvent) {
+		e.stopPropagation();
+		await fetch(`/api/projects/${id}`, { method: 'DELETE' });
+		projects = projects.filter((p) => p.id !== id);
+		if (selectedProjectId === id) {
+			selectedProjectId = '';
+			navigate('', rangeInput);
+		}
+	}
+
+	// ── Helpers ──────────────────────────────────────────────
+
+	function deriveName(path: string) {
+		return path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean).at(-1) ?? path;
+	}
+
 	function fileLabel(path: string) {
-		const parts = path.split('/');
-		return parts[parts.length - 1];
+		return path.split('/').at(-1) ?? path;
 	}
 
 	function fileDir(path: string) {
@@ -40,25 +106,112 @@
 		const green = Math.round((additions / total) * 5);
 		return Array.from({ length: 5 }, (_, i) => (i < green ? 'add' : 'del'));
 	}
+
+	function projectLabel(cwd: string) {
+		return deriveName(cwd);
+	}
 </script>
+
+<!-- Close dropdown on backdrop click -->
+{#if dropdownOpen}
+	<div
+		class="backdrop"
+		role="presentation"
+		tabindex="-1"
+		onclick={() => (dropdownOpen = false)}
+		onkeydown={(e) => e.key === 'Escape' && (dropdownOpen = false)}
+	></div>
+{/if}
 
 <div class="page">
 	<!-- Top bar -->
 	<header class="topbar">
 		<span class="topbar-label">Diff</span>
-		<form method="GET" class="range-form">
-			<input
-				name="range"
-				value={data.range}
-				class="range-input"
-				placeholder="HEAD~1..HEAD"
-				spellcheck="false"
-				autocomplete="off"
-			/>
-			<button type="submit" class="run-btn">Run</button>
-		</form>
+
+		<!-- Project selector -->
+		<div class="project-selector">
+			<button
+				class="project-btn"
+				class:open={dropdownOpen}
+				onclick={() => (dropdownOpen = !dropdownOpen)}
+				title={selectedProject?.path ?? data.cwd}
+			>
+				<span class="proj-btn-name">{selectedProject?.name ?? projectLabel(data.cwd)}</span>
+				<span class="proj-chevron">▾</span>
+			</button>
+
+			{#if dropdownOpen}
+				<div class="proj-dropdown">
+					<!-- This repo (default) -->
+					<button
+						class="proj-option"
+						class:active={!selectedProjectId}
+						onclick={() => selectProject('')}
+					>
+						<span class="proj-option-name">{projectLabel(data.cwd)}</span>
+						<span class="proj-option-path">{data.cwd}</span>
+					</button>
+
+					{#if projects.length > 0}
+						<div class="proj-divider"></div>
+						{#each projects as p (p.id)}
+							<div class="proj-option-row" class:active={selectedProjectId === p.id}>
+								<button class="proj-option" onclick={() => selectProject(p.id)}>
+									<span class="proj-option-name">{p.name}</span>
+									<span class="proj-option-path">{p.path}</span>
+								</button>
+								<button
+									class="proj-del"
+									onclick={(e) => deleteProject(p.id, e)}
+									aria-label="Remove project"
+								>×</button>
+							</div>
+						{/each}
+					{/if}
+
+					<div class="proj-divider"></div>
+					<div class="proj-add-row">
+						<input
+							bind:this={addPathInput}
+							bind:value={newProjectPath}
+							class="proj-add-input"
+							placeholder="/path/to/repo"
+							spellcheck="false"
+							onkeydown={(e) => {
+								if (e.key === 'Enter') addProject();
+								if (e.key === 'Escape') dropdownOpen = false;
+							}}
+						/>
+						<button class="proj-add-btn" onclick={addProject}>Add</button>
+					</div>
+				</div>
+			{/if}
+		</div>
+
+		<!-- Range input -->
+		<input
+			class="range-input"
+			bind:value={rangeInput}
+			placeholder="HEAD~1..HEAD"
+			spellcheck="false"
+			autocomplete="off"
+			onkeydown={(e) => e.key === 'Enter' && navigate(selectedProjectId, rangeInput)}
+		/>
+		<button
+			class="run-btn"
+			class:loading={loading}
+			disabled={loading}
+			onclick={() => navigate(selectedProjectId, rangeInput)}
+		>
+			{#if loading}
+				<span class="spinner"></span>
+			{:else}
+				Run
+			{/if}
+		</button>
+
 		{#if data.error}
-			<span class="error-badge">Error</span>
+			<span class="error-badge" title={data.error}>Error</span>
 		{/if}
 	</header>
 
@@ -92,7 +245,7 @@
 									<span class="file-dir">{fileDir(file.path)}/</span>
 								{/if}
 								{fileLabel(file.path)}
-								{#if file.isNew}<span class="badge new">N</span>{/if}
+								{#if file.isUntracked}<span class="badge untracked">U</span>{:else if file.isNew}<span class="badge new">N</span>{/if}
 								{#if file.isDeleted}<span class="badge del">D</span>{/if}
 							</span>
 							<span class="file-stats">
@@ -125,7 +278,6 @@
 				</div>
 			{:else}
 				<div class="diff-file">
-					<!-- File header -->
 					<div class="diff-file-header">
 						<span class="diff-file-path">
 							{#if fileDir(activeFile.path)}
@@ -134,7 +286,7 @@
 							<span class="diff-file-name">{fileLabel(activeFile.path)}</span>
 						</span>
 						<span class="diff-file-meta">
-							{#if activeFile.isNew}<span class="badge new">new file</span>{/if}
+							{#if activeFile.isUntracked}<span class="badge untracked">untracked</span>{:else if activeFile.isNew}<span class="badge new">new file</span>{/if}
 							{#if activeFile.isDeleted}<span class="badge del">deleted</span>{/if}
 							{#if !activeFile.isBinary}
 								<span class="stat-add">+{activeFile.additions}</span>
@@ -148,7 +300,6 @@
 						</span>
 					</div>
 
-					<!-- Diff content -->
 					{#if activeFile.isBinary}
 						<div class="binary-notice">Binary file changed</div>
 					{:else if activeFile.hunks.length === 0}
@@ -190,7 +341,13 @@
 </div>
 
 <style>
-	/* ── Page shell ─────────────────────────────────────────── */
+	/* ── Layout ─────────────────────────────────────────────── */
+	.backdrop {
+		position: fixed;
+		inset: 0;
+		z-index: 40;
+	}
+
 	.page {
 		display: flex;
 		flex-direction: column;
@@ -201,11 +358,13 @@
 	.topbar {
 		display: flex;
 		align-items: center;
-		gap: 0.75rem;
-		padding: 0.625rem 1rem;
+		gap: 0.5rem;
+		padding: 0.5rem 0.875rem;
 		background: var(--bg-2);
 		border-bottom: 1px solid var(--border);
 		flex-shrink: 0;
+		z-index: 41;
+		position: relative;
 	}
 
 	.topbar-label {
@@ -217,16 +376,201 @@
 		flex-shrink: 0;
 	}
 
-	.range-form {
+	.body {
+		display: flex;
+		flex: 1;
+		overflow: hidden;
+	}
+
+	/* ── Project selector ───────────────────────────────────── */
+	.project-selector {
+		position: relative;
+		flex-shrink: 0;
+	}
+
+	.project-btn {
 		display: flex;
 		align-items: center;
 		gap: 0.375rem;
-		flex: 1;
-		max-width: 400px;
+		background: var(--surface);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-2);
+		padding: 0.3rem 0.625rem;
+		font-size: 0.8125rem;
+		white-space: nowrap;
+		transition:
+			background 0.15s,
+			border-color 0.15s;
 	}
 
+	.project-btn:hover,
+	.project-btn.open {
+		background: var(--surface-2);
+		border-color: var(--accent-muted);
+	}
+
+	.proj-btn-name {
+		max-width: 140px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.proj-chevron {
+		color: var(--text-ghost);
+		font-size: 0.6875rem;
+	}
+
+	/* ── Dropdown ───────────────────────────────────────────── */
+	.proj-dropdown {
+		position: absolute;
+		top: calc(100% + 4px);
+		left: 0;
+		z-index: 50;
+		width: 300px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 8px;
+		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+		overflow: hidden;
+	}
+
+	.proj-option {
+		display: flex;
+		flex-direction: column;
+		align-items: flex-start;
+		width: 100%;
+		padding: 0.5rem 0.75rem;
+		background: none;
+		border: none;
+		text-align: left;
+		gap: 1px;
+		transition: background 0.1s;
+		cursor: pointer;
+	}
+
+	.proj-option:hover {
+		background: var(--accent-bg);
+	}
+
+	.proj-option-row {
+		display: flex;
+		align-items: stretch;
+	}
+
+	.proj-option-row .proj-option {
+		flex: 1;
+		min-width: 0;
+	}
+
+	.proj-option-row.active .proj-option,
+	.proj-option-row.active {
+		background: var(--accent-bg);
+	}
+
+	/* "This repo" also needs active state */
+	.proj-option.active {
+		background: var(--accent-bg);
+	}
+
+	.proj-option-name {
+		font-size: 0.8125rem;
+		font-weight: 500;
+		color: var(--text-2);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		width: 100%;
+	}
+
+	.proj-option-row.active .proj-option-name,
+	.proj-option.active .proj-option-name {
+		color: var(--accent);
+	}
+
+	.proj-option-path {
+		font-size: 0.6875rem;
+		color: var(--text-ghost);
+		font-family: 'Courier New', monospace;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		width: 100%;
+	}
+
+	.proj-del {
+		flex-shrink: 0;
+		background: none;
+		border: none;
+		color: transparent;
+		font-size: 1rem;
+		padding: 0 0.625rem;
+		transition: color 0.1s;
+		cursor: pointer;
+	}
+
+	.proj-option-row:hover .proj-del {
+		color: var(--text-ghost);
+	}
+
+	.proj-option-row:hover .proj-del:hover {
+		color: var(--accent);
+	}
+
+	.proj-divider {
+		height: 1px;
+		background: var(--border-2);
+		margin: 0.25rem 0;
+	}
+
+	.proj-add-row {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.5rem 0.625rem;
+	}
+
+	.proj-add-input {
+		flex: 1;
+		background: var(--bg-2);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text);
+		padding: 0.3rem 0.5rem;
+		font-size: 0.8rem;
+		font-family: 'Courier New', monospace;
+		outline: none;
+		transition: border-color 0.15s;
+	}
+
+	.proj-add-input:focus {
+		border-color: var(--accent);
+	}
+
+	.proj-add-input::placeholder {
+		color: var(--text-ghost);
+	}
+
+	.proj-add-btn {
+		background: var(--accent-bg);
+		border: 1px solid var(--accent-muted);
+		border-radius: 5px;
+		color: var(--accent);
+		padding: 0.3rem 0.625rem;
+		font-size: 0.8rem;
+		flex-shrink: 0;
+		transition: background 0.15s;
+	}
+
+	.proj-add-btn:hover {
+		background: var(--accent-muted);
+		color: var(--text);
+	}
+
+	/* ── Range input ────────────────────────────────────────── */
 	.range-input {
 		flex: 1;
+		max-width: 320px;
 		background: var(--surface);
 		border: 1px solid var(--border);
 		border-radius: 5px;
@@ -253,9 +597,35 @@
 		transition: background 0.15s;
 	}
 
-	.run-btn:hover {
+	.run-btn:hover:not(:disabled) {
 		background: var(--accent-muted);
 		color: var(--text);
+	}
+
+	.run-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+
+	.run-btn.loading {
+		min-width: 48px;
+	}
+
+	.spinner {
+		display: inline-block;
+		width: 12px;
+		height: 12px;
+		border: 2px solid var(--accent-muted);
+		border-top-color: var(--accent);
+		border-radius: 50%;
+		animation: spin 0.55s linear infinite;
+		vertical-align: middle;
+	}
+
+	@keyframes spin {
+		to {
+			transform: rotate(360deg);
+		}
 	}
 
 	.error-badge {
@@ -265,12 +635,7 @@
 		color: var(--accent);
 		border-radius: 4px;
 		padding: 0.15rem 0.5rem;
-	}
-
-	.body {
-		display: flex;
-		flex: 1;
-		overflow: hidden;
+		flex-shrink: 0;
 	}
 
 	/* ── File list ──────────────────────────────────────────── */
@@ -327,10 +692,10 @@
 		color: var(--text-muted);
 		text-align: left;
 		gap: 0.5rem;
+		font-size: 0.8rem;
 		transition:
 			background 0.1s,
 			color 0.1s;
-		font-size: 0.8rem;
 	}
 
 	.file-item:hover {
@@ -467,11 +832,6 @@
 		line-height: 1.5;
 	}
 
-	.diff-table tbody tr {
-		border-bottom: none;
-	}
-
-	/* Line number cells */
 	.ln {
 		width: 44px;
 		min-width: 44px;
@@ -488,7 +848,6 @@
 		border-right: none;
 	}
 
-	/* Sign column */
 	.diff-sign {
 		width: 20px;
 		min-width: 20px;
@@ -499,7 +858,6 @@
 		vertical-align: top;
 	}
 
-	/* Content column */
 	.diff-content {
 		padding: 0 1rem 0 0.25rem;
 		white-space: pre;
@@ -508,7 +866,6 @@
 		color: var(--text-2);
 	}
 
-	/* Hunk header row */
 	.hunk-row td {
 		background: #0d1a0d;
 		padding: 0.25rem 0;
@@ -534,7 +891,6 @@
 		margin-left: 0.5rem;
 	}
 
-	/* Added rows */
 	.diff-row.add td {
 		background: #071507;
 	}
@@ -553,7 +909,6 @@
 		color: #9de8b0;
 	}
 
-	/* Removed rows */
 	.diff-row.remove td {
 		background: #1e0505;
 	}
@@ -572,7 +927,6 @@
 		color: #e8a0a0;
 	}
 
-	/* Context rows */
 	.diff-row.context td {
 		background: var(--bg-2);
 	}
@@ -581,7 +935,7 @@
 		color: var(--text-dim);
 	}
 
-	/* ── Shared stats / badges ──────────────────────────────── */
+	/* ── Shared ─────────────────────────────────────────────── */
 	.stat-add {
 		color: #4ade80;
 		font-weight: 600;
@@ -636,6 +990,12 @@
 		background: #071507;
 		color: #4ade80;
 		border: 1px solid #0a1f0a;
+	}
+
+	.badge.untracked {
+		background: #0f0e02;
+		color: #c9a84c;
+		border: 1px solid #2a2508;
 	}
 
 	.badge.del {

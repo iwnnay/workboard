@@ -1,3 +1,7 @@
+import { readFileSync } from 'fs';
+import { join } from 'path';
+import { execSync } from 'child_process';
+
 export type DiffLine = {
 	type: 'add' | 'remove' | 'context';
 	content: string;
@@ -19,6 +23,7 @@ export type DiffFile = {
 	isBinary: boolean;
 	isNew: boolean;
 	isDeleted: boolean;
+	isUntracked: boolean;
 };
 
 export function parseDiff(raw: string): DiffFile[] {
@@ -38,7 +43,8 @@ export function parseDiff(raw: string): DiffFile[] {
 				deletions: 0,
 				isBinary: false,
 				isNew: false,
-				isDeleted: false
+				isDeleted: false,
+				isUntracked: false
 			};
 			hunk = null;
 			files.push(file);
@@ -80,4 +86,77 @@ export function parseDiff(raw: string): DiffFile[] {
 	}
 
 	return files;
+}
+
+export function getUntrackedDiffs(cwd: string): DiffFile[] {
+	let output: string;
+	try {
+		output = execSync('git ls-files --others --exclude-standard -z', {
+			encoding: 'utf8',
+			cwd,
+			timeout: 10_000
+		}).trim();
+	} catch {
+		return [];
+	}
+
+	if (!output) return [];
+
+	// -z uses NUL as separator — safe for filenames with spaces/newlines
+	const paths = output.split('\0').filter(Boolean);
+	const result: DiffFile[] = [];
+
+	for (const filePath of paths) {
+		const fullPath = join(cwd, filePath);
+		try {
+			const buf = readFileSync(fullPath);
+			const isBinary = buf.subarray(0, 8192).indexOf(0) !== -1;
+
+			if (isBinary) {
+				result.push({
+					path: filePath,
+					hunks: [],
+					additions: 0,
+					deletions: 0,
+					isBinary: true,
+					isNew: true,
+					isDeleted: false,
+					isUntracked: true
+				});
+				continue;
+			}
+
+			const text = buf.toString('utf8');
+			const lines = text.split('\n');
+			if (lines.at(-1) === '') lines.pop(); // strip trailing newline artifact
+
+			const diffLines: DiffLine[] = lines.map((content, i) => ({
+				type: 'add' as const,
+				content,
+				oldNum: null,
+				newNum: i + 1
+			}));
+
+			result.push({
+				path: filePath,
+				hunks: [
+					{
+						header: `@@ -0,0 +1,${lines.length} @@`,
+						context: '',
+						lines: diffLines
+					}
+				],
+				additions: lines.length,
+				deletions: 0,
+				isBinary: false,
+				isNew: true,
+				isDeleted: false,
+				isUntracked: true
+			});
+		} catch {
+			// skip unreadable files (permissions, etc.)
+		}
+	}
+
+	return result;
 }

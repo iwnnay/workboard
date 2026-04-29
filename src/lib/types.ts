@@ -14,6 +14,13 @@ export type Note = {
 	updatedAt: string;
 };
 
+export type Project = {
+	id: string;
+	name: string;
+	path: string;
+	createdAt: string;
+};
+
 export type BookmarkFolder = {
 	id: string;
 	name: string;
