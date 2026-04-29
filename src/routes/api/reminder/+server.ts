@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import { db } from '$lib/server/db';
 import { reminder } from '$lib/server/db/schema';
+import { REMINDER_ID } from '$lib/server/constants';
 
 export async function GET() {
 	const row = await db.query.reminder.findFirst();
@@ -9,12 +10,10 @@ export async function GET() {
 
 export async function PUT({ request }) {
 	const { content } = await request.json();
+	const now = new Date().toISOString();
 	await db
 		.insert(reminder)
-		.values({ id: 'singleton', content, updatedAt: new Date().toISOString() })
-		.onConflictDoUpdate({
-			target: reminder.id,
-			set: { content, updatedAt: new Date().toISOString() }
-		});
+		.values({ id: REMINDER_ID, content, updatedAt: now })
+		.onConflictDoUpdate({ target: reminder.id, set: { content, updatedAt: now } });
 	return json({ success: true });
 }

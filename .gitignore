@@ -27,3 +27,4 @@ vite.config.ts.timestamp-*
 
 # Dev logs
 logs/
+.idea/

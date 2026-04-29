@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { api } from '$lib/api';
 
 	let {
 		open = $bindable(false),
@@ -23,11 +24,7 @@
 	}
 
 	async function persist() {
-		await fetch('/api/reminder', {
-			method: 'PUT',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ content })
-		});
+		await api.put('/api/reminder', { content });
 	}
 
 	async function clear() {

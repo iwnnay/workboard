@@ -1,0 +1,7 @@
+- [ ] On the dashboard page within the to-do list porition. Sometimes my todo items are longer that the area is wide. We need to add a hover that lets me see the full text in a bubble.
+- [ ] Added a close all button in the notes section so that I can close notes if I need to share my screen in a meeting or something.
+- [ ] Use `HEAD~1` as the default run on the diff page
+- [ ] If I move away from the dashboard and there are open notes they should be saved
+- [ ] If I didn't manually close a note on the dashboard, navigate away, and then come back, the same notes as before should be open
+- [ ] diff page should remmber which project I selected and use that until I change it.
+- [ ] on the diff page, It would be nice to have a green check mark next to filename that I can toggle just to mark my progress. At this time, it doesn't do anything other than I'm done looking at that diff.

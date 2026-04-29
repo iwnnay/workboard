@@ -15,7 +15,6 @@
 	let loading = $state(false);
 	let dropdownOpen = $state(false);
 	let newProjectPath = $state('');
-	let addPathInput = $state<HTMLInputElement | null>(null);
 
 	// File list UI
 	let filterQuery = $state('');
@@ -172,7 +171,6 @@
 					<div class="proj-divider"></div>
 					<div class="proj-add-row">
 						<input
-							bind:this={addPathInput}
 							bind:value={newProjectPath}
 							class="proj-add-input"
 							placeholder="/path/to/repo"

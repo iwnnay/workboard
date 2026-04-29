@@ -1,12 +1,13 @@
 import type { PageServerLoad } from './$types';
 import { execSync } from 'child_process';
 import { parseDiff, getUntrackedDiffs, type DiffFile } from '$lib/server/git';
+import { DEFAULT_DIFF_RANGE } from '$lib/constants';
 import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
 import { asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ url }) => {
-	const range = url.searchParams.get('range') ?? 'HEAD~1..HEAD';
+	const range = url.searchParams.get('range') ?? DEFAULT_DIFF_RANGE;
 	const projectId = url.searchParams.get('projectId') ?? '';
 	const safeRange = range.replace(/[^a-zA-Z0-9.\-_/~^@{}:]/g, '');
 

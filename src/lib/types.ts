@@ -35,3 +35,10 @@ export type Bookmark = {
 	description: string;
 	createdAt: string;
 };
+
+/** Editable subset of a Bookmark — used by the inline edit/create forms. */
+export type BookmarkDraft = {
+	name: string;
+	url: string;
+	description: string;
+};
