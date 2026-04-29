@@ -9,10 +9,10 @@ Write-Host "Checking for process on port 7200..."
 $listening = netstat -ano | Select-String "TCP\s+[^\s]+:7200\s+[^\s]+\s+LISTENING"
 foreach ($line in $listening) {
     $parts = $line.Line.Trim() -split '\s+'
-    $pid = $parts[-1]
-    if ($pid -match '^\d+$' -and [int]$pid -gt 0) {
-        Write-Host "  Stopping PID $pid..."
-        Stop-Process -Id ([int]$pid) -Force -ErrorAction SilentlyContinue
+    $procId = $parts[-1]
+    if ($procId -match '^\d+$' -and [int]$procId -gt 0) {
+        Write-Host "  Stopping PID $procId..."
+        Stop-Process -Id ([int]$procId) -Force -ErrorAction SilentlyContinue
         Start-Sleep -Seconds 1
     }
 }
