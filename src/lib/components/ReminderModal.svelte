@@ -1,21 +1,44 @@
 <script lang="ts">
-	let { open = $bindable(false) }: { open: boolean } = $props();
+	import { untrack } from 'svelte';
 
-	let content = $state('');
+	let {
+		open = $bindable(false),
+		initialContent = ''
+	}: {
+		open: boolean;
+		initialContent?: string;
+	} = $props();
+
+	let content = $state(untrack(() => initialContent));
 	let textareaEl = $state<HTMLTextAreaElement | null>(null);
+	let saveTimer: ReturnType<typeof setTimeout>;
 
 	$effect(() => {
-		if (open) {
-			content = localStorage.getItem('reminder') ?? '';
-			setTimeout(() => textareaEl?.focus(), 0);
-		}
+		if (open) setTimeout(() => textareaEl?.focus(), 0);
 	});
 
-	$effect(() => {
-		localStorage.setItem('reminder', content);
-	});
+	function scheduleSave() {
+		clearTimeout(saveTimer);
+		saveTimer = setTimeout(persist, 1000);
+	}
+
+	async function persist() {
+		await fetch('/api/reminder', {
+			method: 'PUT',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ content })
+		});
+	}
+
+	async function clear() {
+		content = '';
+		clearTimeout(saveTimer);
+		await persist();
+	}
 
 	function close() {
+		clearTimeout(saveTimer);
+		persist();
 		open = false;
 	}
 
@@ -48,18 +71,11 @@
 			<textarea
 				bind:this={textareaEl}
 				bind:value={content}
+				oninput={scheduleSave}
 				placeholder="Write a quick note..."
 			></textarea>
 			<div class="modal-footer">
-				<button
-					class="clear-btn"
-					onclick={() => {
-						content = '';
-						localStorage.removeItem('reminder');
-					}}
-				>
-					Clear
-				</button>
+				<button class="clear-btn" onclick={clear}>Clear</button>
 				<button class="close-action" onclick={close}>Close</button>
 			</div>
 		</div>

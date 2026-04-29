@@ -21,7 +21,7 @@
 	</main>
 </div>
 
-<ReminderModal bind:open={reminderOpen} />
+<ReminderModal bind:open={reminderOpen} initialContent={data.reminderContent} />
 
 <style>
 	.dashboard {

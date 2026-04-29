@@ -1,6 +1,6 @@
 import type { PageServerLoad } from './$types';
 import { db } from '$lib/server/db';
-import { todo, note } from '$lib/server/db/schema';
+import { todo, note, reminder } from '$lib/server/db/schema';
 import { and, asc, desc, eq, isNotNull, lt } from 'drizzle-orm';
 
 export const load: PageServerLoad = async () => {
@@ -10,10 +10,11 @@ export const load: PageServerLoad = async () => {
 		.delete(todo)
 		.where(and(eq(todo.completed, true), isNotNull(todo.completedAt), lt(todo.completedAt, threeDaysAgo)));
 
-	const [todos, notes] = await Promise.all([
+	const [todos, notes, reminderRow] = await Promise.all([
 		db.select().from(todo).orderBy(asc(todo.createdAt)),
-		db.select().from(note).orderBy(desc(note.updatedAt))
+		db.select().from(note).orderBy(desc(note.updatedAt)),
+		db.query.reminder.findFirst()
 	]);
 
-	return { todos, notes };
+	return { todos, notes, reminderContent: reminderRow?.content ?? '' };
 };

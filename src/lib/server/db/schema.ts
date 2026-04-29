@@ -26,6 +26,14 @@ export const note = sqliteTable('note', {
 		.$defaultFn(() => new Date().toISOString())
 });
 
+export const reminder = sqliteTable('reminder', {
+	id: text('id').primaryKey().default('singleton'),
+	content: text('content').notNull().default(''),
+	updatedAt: text('updated_at')
+		.notNull()
+		.$defaultFn(() => new Date().toISOString())
+});
+
 export const project = sqliteTable('project', {
 	id: text('id')
 		.primaryKey()
