@@ -63,7 +63,7 @@
 	<ul class="list">
 		{#each active as item (item.id)}
 			<li class="item">
-				<label class="item-label">
+				<label class="item-label" data-tip={item.text}>
 					<input class="check" type="checkbox" onchange={() => toggleTodo(item)} />
 					<span>{item.text}</span>
 				</label>
@@ -81,7 +81,7 @@
 			<ul class="list">
 				{#each completed as item (item.id)}
 					<li class="item done">
-						<label class="item-label">
+						<label class="item-label" data-tip={item.text}>
 							<input class="check" type="checkbox" checked onchange={() => toggleTodo(item)} />
 							<span>{item.text}</span>
 						</label>
@@ -157,6 +157,27 @@
 		cursor: pointer;
 		color: var(--text-2);
 		min-width: 0;
+		position: relative;
+	}
+
+	.item-label:hover::after {
+		content: attr(data-tip);
+		position: absolute;
+		left: 0;
+		top: calc(100% + 3px);
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		color: var(--text);
+		padding: 0.375rem 0.625rem;
+		border-radius: 6px;
+		font-size: 0.8125rem;
+		white-space: normal;
+		width: 240px;
+		z-index: 60;
+		box-shadow: 0 3px 10px rgba(0, 0, 0, 0.4);
+		pointer-events: none;
+		word-break: break-word;
+		line-height: 1.45;
 	}
 
 	.item-label span {

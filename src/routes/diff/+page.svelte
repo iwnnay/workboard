@@ -2,7 +2,9 @@
 	import type { PageData } from './$types';
 	import type { DiffFile } from '$lib/server/git';
 	import type { Project } from '$lib/types';
-	import { untrack } from 'svelte';
+	import { untrack, onMount } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { goto } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
 
@@ -19,6 +21,7 @@
 	// File list UI
 	let filterQuery = $state('');
 	let _selectedPath = $state<string | null>(null);
+	let reviewed = new SvelteSet<string>();
 
 	// ── Derived ──────────────────────────────────────────────
 
@@ -44,7 +47,21 @@
 
 	// ── Navigation ───────────────────────────────────────────
 
+	onMount(() => {
+		// Auto-select the last used project if the URL has none
+		if (!data.projectId) {
+			const saved = localStorage.getItem('diff_projectId');
+			if (saved && data.projects.find((p) => p.id === saved)) {
+				const params = new URLSearchParams({ range: data.range, projectId: saved });
+				goto(`/diff?${params.toString()}`, { replaceState: true });
+			}
+		}
+		// Clear reviewed marks when a new diff loads
+		reviewed.clear();
+	});
+
 	function navigate(projectId: string, range: string) {
+		localStorage.setItem('diff_projectId', projectId);
 		const params = new URLSearchParams({ range });
 		if (projectId) params.set('projectId', projectId);
 		loading = true;
@@ -232,10 +249,14 @@
 					<p class="list-empty">No files.</p>
 				{:else}
 					{#each filteredFiles as file (file.path)}
-						<button
+						<div
 							class="file-item"
 							class:active={selectedPath === file.path}
+							class:is-reviewed={reviewed.has(file.path)}
+							role="button"
+							tabindex="0"
 							onclick={() => (_selectedPath = file.path)}
+							onkeydown={(e) => e.key === 'Enter' && (_selectedPath = file.path)}
 							title={file.path}
 						>
 							<span class="file-name">
@@ -258,7 +279,17 @@
 									{/if}
 								{/if}
 							</span>
-						</button>
+							<button
+								class="review-btn"
+								class:done={reviewed.has(file.path)}
+								onclick={(e) => {
+									e.stopPropagation();
+									if (reviewed.has(file.path)) reviewed.delete(file.path);
+									else reviewed.add(file.path);
+								}}
+								aria-label="Mark as reviewed"
+							>✓</button>
+						</div>
 					{/each}
 				{/if}
 			</div>
@@ -685,12 +716,10 @@
 		justify-content: space-between;
 		width: 100%;
 		padding: 0.4rem 0.75rem;
-		background: none;
-		border: none;
 		color: var(--text-muted);
-		text-align: left;
 		gap: 0.5rem;
 		font-size: 0.8rem;
+		cursor: pointer;
 		transition:
 			background 0.1s,
 			color 0.1s;
@@ -706,6 +735,35 @@
 		color: var(--text-2);
 		border-left: 2px solid var(--accent);
 		padding-left: calc(0.75rem - 2px);
+	}
+
+	.file-item.is-reviewed {
+		opacity: 0.5;
+	}
+
+	.review-btn {
+		flex-shrink: 0;
+		background: none;
+		border: none;
+		color: var(--text-ghost);
+		font-size: 0.8rem;
+		padding: 0.1rem 0.2rem;
+		border-radius: 3px;
+		opacity: 0;
+		transition:
+			color 0.1s,
+			opacity 0.1s;
+		cursor: pointer;
+		line-height: 1;
+	}
+
+	.file-item:hover .review-btn {
+		opacity: 1;
+	}
+
+	.review-btn.done {
+		color: #4ade80;
+		opacity: 1;
 	}
 
 	.file-name {

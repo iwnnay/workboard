@@ -1,13 +1,51 @@
 <script lang="ts">
 	import type { Note } from '$lib/types';
-	import { untrack } from 'svelte';
+	import { untrack, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import NoteEditor from './NoteEditor.svelte';
 
 	let { initialNotes }: { initialNotes: Note[] } = $props();
 
 	let notes = $state<Note[]>(untrack(() => initialNotes));
-	let openNoteIds = $state<string[]>([]);
-	let drafts = $state<Record<string, { title: string; content: string }>>({});
+
+	// Compute the restored IDs once as a plain value (not reactive state) so
+	// both openNoteIds and drafts can be initialized from it without Svelte
+	// warning about reactive references inside $state() initializers.
+	const restoredIds: string[] = browser
+		? (() => {
+				try {
+					const saved = localStorage.getItem('openNoteIds');
+					if (saved) {
+						const ids: string[] = JSON.parse(saved);
+						return ids.filter((id) => initialNotes.some((n) => n.id === id));
+					}
+				} catch {}
+				return [];
+			})()
+		: [];
+
+	let openNoteIds = $state<string[]>(restoredIds);
+
+	// Pre-populate drafts for every restored note so column titles and search
+	// work correctly before NoteEditor's own onMount fires.
+	let drafts = $state<Record<string, { title: string; content: string }>>(
+		restoredIds.reduce(
+			(acc, id) => {
+				const note = initialNotes.find((n) => n.id === id);
+				if (!note) return acc;
+				try {
+					const stored = browser ? localStorage.getItem(`draft_${id}`) : null;
+					acc[id] = stored
+						? JSON.parse(stored)
+						: { title: note.title, content: note.content };
+				} catch {
+					acc[id] = { title: note.title, content: note.content };
+				}
+				return acc;
+			},
+			{} as Record<string, { title: string; content: string }>
+		)
+	);
 
 	let showPopup = $state(false);
 	let searchQuery = $state('');
@@ -28,9 +66,17 @@
 	);
 
 	$effect(() => {
-		if (showPopup) {
-			setTimeout(() => searchInputEl?.focus(), 0);
-		}
+		if (showPopup) setTimeout(() => searchInputEl?.focus(), 0);
+	});
+
+	// Persist open note IDs on every change (safe: first run re-writes the
+	// same value we just loaded, so nothing is lost).
+	$effect(() => {
+		if (browser) localStorage.setItem('openNoteIds', JSON.stringify(openNoteIds));
+	});
+
+	onDestroy(() => {
+		saveAll(); // fire-and-forget — fetch outlives the component
 	});
 
 	function openPopup() {
@@ -85,6 +131,12 @@
 
 	async function saveAll() {
 		await Promise.all(openNoteIds.map((id) => saveToDb(id)));
+	}
+
+	async function closeAll() {
+		await saveAll();
+		openNoteIds = [];
+		drafts = {};
 	}
 
 	function handleNoteChange(id: string, draft: { title: string; content: string }) {
@@ -199,6 +251,9 @@
 			☰
 		</button>
 		<span class="panel-label">Notes</span>
+		{#if openNoteIds.length > 0}
+			<button class="close-all-btn" onclick={closeAll}>Close all</button>
+		{/if}
 		<button class="new-btn" onclick={createNote}>+ New</button>
 	</header>
 
@@ -353,6 +408,23 @@
 		letter-spacing: 0.08em;
 		color: var(--text-ghost);
 		flex: 1;
+	}
+
+	.close-all-btn {
+		background: none;
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-ghost);
+		padding: 0.25rem 0.625rem;
+		font-size: 0.8125rem;
+		transition:
+			color 0.15s,
+			border-color 0.15s;
+	}
+
+	.close-all-btn:hover {
+		color: var(--text-muted);
+		border-color: var(--text-dim);
 	}
 
 	.new-btn {
