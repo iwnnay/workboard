@@ -1,9 +1,9 @@
 <script lang="ts">
 	import type { PageData } from './$types';
-	import type { DiffFile } from '$lib/server/git';
+	import type { DiffFile, DiffLine } from '$lib/server/git';
 	import type { Project } from '$lib/types';
 	import { untrack, onMount } from 'svelte';
-	import { SvelteSet } from 'svelte/reactivity';
+	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { goto } from '$app/navigation';
 
 	let { data }: { data: PageData } = $props();
@@ -22,6 +22,12 @@
 	let filterQuery = $state('');
 	let _selectedPath = $state<string | null>(null);
 	let reviewed = new SvelteSet<string>();
+
+	// Diff view features
+	let sideBySide = $state(false);
+	let highlightWord = $state('');
+	let copyRef = $state<{ x: number; y: number; ref: string } | null>(null);
+	let expandedGaps = new SvelteMap<string, string[]>();
 
 	// ── Derived ──────────────────────────────────────────────
 
@@ -48,7 +54,6 @@
 	// ── Navigation ───────────────────────────────────────────
 
 	onMount(() => {
-		// Auto-select the last used project if the URL has none
 		if (!data.projectId) {
 			const saved = localStorage.getItem('diff_projectId');
 			if (saved && data.projects.find((p) => p.id === saved)) {
@@ -56,8 +61,8 @@
 				goto(`/diff?${params.toString()}`, { replaceState: true });
 			}
 		}
-		// Clear reviewed marks when a new diff loads
 		reviewed.clear();
+		expandedGaps.clear();
 	});
 
 	function navigate(projectId: string, range: string) {
@@ -126,6 +131,149 @@
 	function projectLabel(cwd: string) {
 		return deriveName(cwd);
 	}
+
+	// ── Content rendering (word highlight) ───────────────────
+
+	type ContentPart = { text: string; hl: boolean };
+
+	function splitContent(content: string, word: string): ContentPart[] {
+		if (!word || word.length < 2) return [{ text: content, hl: false }];
+		try {
+			const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'g');
+			return content.split(re).map((text, i) => ({ text, hl: i % 2 === 1 }));
+		} catch {
+			return [{ text: content, hl: false }];
+		}
+	}
+
+	// ── Side-by-side ─────────────────────────────────────────
+
+	type SbsRow = { left: DiffLine | null; right: DiffLine | null };
+
+	function computeSideBySide(lines: DiffLine[]): SbsRow[] {
+		const rows: SbsRow[] = [];
+		let i = 0;
+		while (i < lines.length) {
+			const line = lines[i];
+			if (line.type === 'context') {
+				rows.push({ left: line, right: line });
+				i++;
+			} else {
+				const removes: DiffLine[] = [];
+				const adds: DiffLine[] = [];
+				while (i < lines.length && lines[i].type === 'remove') removes.push(lines[i++]);
+				while (i < lines.length && lines[i].type === 'add') adds.push(lines[i++]);
+				const len = Math.max(removes.length, adds.length);
+				for (let j = 0; j < len; j++) {
+					rows.push({ left: removes[j] ?? null, right: adds[j] ?? null });
+				}
+			}
+		}
+		return rows;
+	}
+
+	// ── Pull-in-lines (expand context gaps) ──────────────────
+
+	type Gap = { newStart: number; newEnd: number; count: number };
+
+	function getGapBefore(file: DiffFile, hunkIdx: number): Gap | null {
+		if (hunkIdx === 0) return null;
+		const prev = file.hunks[hunkIdx - 1];
+		const curr = file.hunks[hunkIdx];
+		const lastNew = [...prev.lines].reverse().find((l) => l.newNum !== null)?.newNum;
+		const firstNew = curr.lines.find((l) => l.newNum !== null)?.newNum;
+		if (lastNew === undefined || firstNew === undefined || firstNew <= lastNew + 1) return null;
+		return { newStart: lastNew + 1, newEnd: firstNew - 1, count: firstNew - lastNew - 1 };
+	}
+
+	function gapKey(filePath: string, hunkIdx: number): string {
+		return `${filePath}:${hunkIdx}`;
+	}
+
+	async function expandGap(file: DiffFile, hunkIdx: number, gap: Gap) {
+		const key = gapKey(file.path, hunkIdx);
+		if (expandedGaps.has(key)) return;
+		const params = new URLSearchParams({
+			projectId: selectedProjectId,
+			path: file.path,
+			range: data.range,
+			start: String(gap.newStart),
+			end: String(gap.newEnd)
+		});
+		try {
+			const res = await fetch(`/api/diff/lines?${params}`);
+			const { lines } = await res.json();
+			expandedGaps.set(key, lines as string[]);
+		} catch {
+			// ignore
+		}
+	}
+
+	// ── Copy file:line reference ──────────────────────────────
+
+	function nodeToRow(node: Node | null): Element | null {
+		const el = node instanceof Element ? node : (node as ChildNode | null)?.parentElement;
+		return el?.closest('tr.diff-row') ?? null;
+	}
+
+	function rowLineNum(row: Element): number | null {
+		const lnNew = (row.querySelector('.ln-new') as HTMLElement | null)?.textContent?.trim();
+		const lnOld = (row.querySelector('.ln-old') as HTMLElement | null)?.textContent?.trim();
+		const n = parseInt(lnNew || lnOld || '');
+		return isNaN(n) ? null : n;
+	}
+
+	function handleDiffMouseUp(e: MouseEvent) {
+		const sel = window.getSelection();
+		const text = sel?.toString().trim() ?? '';
+
+		if (!text) {
+			highlightWord = '';
+			copyRef = null;
+			return;
+		}
+
+		if (text.length >= 2 && !text.includes('\n')) {
+			highlightWord = text;
+		}
+
+		if (!activeFile || !sel) {
+			copyRef = null;
+			return;
+		}
+
+		const anchorRow = nodeToRow(sel.anchorNode);
+		const focusRow = nodeToRow(sel.focusNode);
+		if (!anchorRow && !focusRow) {
+			copyRef = null;
+			return;
+		}
+
+		const anchorLn = anchorRow ? rowLineNum(anchorRow) : null;
+		const focusLn = focusRow ? rowLineNum(focusRow) : null;
+		const a = anchorLn ?? focusLn;
+		const b = focusLn ?? anchorLn;
+
+		if (a === null) {
+			copyRef = null;
+			return;
+		}
+
+		const lineRef =
+			a !== b && b !== null ? `${Math.min(a, b)}-${Math.max(a, b)}` : String(a);
+
+		copyRef = { x: e.clientX, y: e.clientY, ref: `${activeFile.path}:${lineRef}` };
+	}
+
+	async function doCopyRef() {
+		if (!copyRef) return;
+		await navigator.clipboard.writeText(copyRef.ref);
+		const saved = copyRef;
+		copyRef = { ...saved, ref: '✓ copied' };
+		setTimeout(() => {
+			if (copyRef?.ref === '✓ copied') copyRef = null;
+		}, 1200);
+	}
 </script>
 
 <!-- Close dropdown on backdrop click -->
@@ -137,6 +285,13 @@
 		onclick={() => (dropdownOpen = false)}
 		onkeydown={(e) => e.key === 'Escape' && (dropdownOpen = false)}
 	></div>
+{/if}
+
+<!-- Copy ref floating tooltip -->
+{#if copyRef}
+	<div class="copy-ref-tooltip" style="left: {copyRef.x}px; top: {copyRef.y - 40}px">
+		<button class="copy-ref-btn" onclick={doCopyRef}>{copyRef.ref}</button>
+	</div>
 {/if}
 
 <div class="page">
@@ -296,7 +451,8 @@
 		</aside>
 
 		<!-- Right: diff view -->
-		<main class="diff-panel">
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<main class="diff-panel" onmouseup={handleDiffMouseUp}>
 			{#if !activeFile}
 				<div class="diff-empty">
 					{#if data.error}
@@ -321,10 +477,18 @@
 								<span class="stat-add">+{activeFile.additions}</span>
 								<span class="stat-del">-{activeFile.deletions}</span>
 								<span class="stat-boxes" aria-hidden="true">
-									{#each statBoxes(activeFile.additions, activeFile.deletions) as box}
+									{#each statBoxes(activeFile.additions, activeFile.deletions) as box, i (i)}
 										<span class="box {box}"></span>
 									{/each}
 								</span>
+							{/if}
+							{#if !activeFile.isBinary && activeFile.hunks.length > 0}
+								<button
+									class="sbs-toggle"
+									class:active={sideBySide}
+									onclick={() => (sideBySide = !sideBySide)}
+									title="Toggle side-by-side"
+								>⇔</button>
 							{/if}
 						</span>
 					</div>
@@ -335,32 +499,117 @@
 						<div class="binary-notice">No textual changes</div>
 					{:else}
 						<div class="diff-table-wrap">
-							<table class="diff-table">
-								<tbody>
-									{#each activeFile.hunks as hunk}
-										<tr class="hunk-row">
-											<td class="ln ln-old" colspan="2"></td>
-											<td class="hunk-header" colspan="2">
-												<span class="hunk-at">@@</span>
-												{hunk.header.slice(2).replace(/@@$/, '').trim()}
-												{#if hunk.context}
-													<span class="hunk-ctx">{hunk.context}</span>
+							{#if sideBySide}
+								<!-- Side-by-side view -->
+								<table class="diff-table sbs-table">
+									<colgroup>
+										<col style="width: 44px" />
+										<col style="width: calc(50% - 44px)" />
+										<col style="width: 44px" />
+										<col style="width: calc(50% - 44px)" />
+									</colgroup>
+									<tbody>
+										{#each activeFile.hunks as hunk, hunkIdx}
+											{@const gap = getGapBefore(activeFile, hunkIdx)}
+											{#if gap}
+												{@const key = gapKey(activeFile.path, hunkIdx)}
+												{@const expanded = expandedGaps.get(key)}
+												{#if expanded}
+													{#each expanded as content, i (i)}
+														<tr class="diff-row context">
+															<td class="ln ln-old">{gap.newStart + i}</td>
+															<td class="diff-content sbs-old context">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+															<td class="ln ln-new">{gap.newStart + i}</td>
+															<td class="diff-content sbs-new context">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+														</tr>
+													{/each}
+												{:else}
+													<tr class="gap-row" onclick={() => expandGap(activeFile, hunkIdx, gap)}>
+														<td colspan="4" class="gap-cell">
+															<button class="gap-btn">↕ {gap.count} lines</button>
+														</td>
+													</tr>
 												{/if}
-											</td>
-										</tr>
-										{#each hunk.lines as line}
-											<tr class="diff-row {line.type}">
-												<td class="ln ln-old">{line.oldNum ?? ''}</td>
-												<td class="ln ln-new">{line.newNum ?? ''}</td>
-												<td class="diff-sign">
-													{#if line.type === 'add'}+{:else if line.type === 'remove'}-{:else}&nbsp;{/if}
+											{/if}
+											<tr class="hunk-row">
+												<td class="ln ln-old" colspan="1"></td>
+												<td class="hunk-header" colspan="3">
+													<span class="hunk-at">@@</span>
+													{hunk.header.slice(2).replace(/@@$/, '').trim()}
+													{#if hunk.context}
+														<span class="hunk-ctx">{hunk.context}</span>
+													{/if}
 												</td>
-												<td class="diff-content">{line.content}</td>
 											</tr>
+											{#each computeSideBySide(hunk.lines) as row, i (i)}
+												<tr class="diff-row sbs-row">
+													<td class="ln ln-old">{row.left?.oldNum ?? ''}</td>
+													<td
+														class="diff-content sbs-old {row.left
+															? row.left.type
+															: 'empty'}"
+													>{#each splitContent(row.left?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+													<td class="ln ln-new">{row.right?.newNum ?? ''}</td>
+													<td
+														class="diff-content sbs-new {row.right
+															? row.right.type
+															: 'empty'}"
+													>{#each splitContent(row.right?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+												</tr>
+											{/each}
 										{/each}
-									{/each}
-								</tbody>
-							</table>
+									</tbody>
+								</table>
+							{:else}
+								<!-- Unified view -->
+								<table class="diff-table">
+									<tbody>
+										{#each activeFile.hunks as hunk, hunkIdx}
+											{@const gap = getGapBefore(activeFile, hunkIdx)}
+											{#if gap}
+												{@const key = gapKey(activeFile.path, hunkIdx)}
+												{@const expanded = expandedGaps.get(key)}
+												{#if expanded}
+													{#each expanded as content, i (i)}
+														<tr class="diff-row context">
+															<td class="ln ln-old">{gap.newStart + i}</td>
+															<td class="ln ln-new">{gap.newStart + i}</td>
+															<td class="diff-sign">&nbsp;</td>
+															<td class="diff-content">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+														</tr>
+													{/each}
+												{:else}
+													<tr class="gap-row" onclick={() => expandGap(activeFile, hunkIdx, gap)}>
+														<td colspan="4" class="gap-cell">
+															<button class="gap-btn">↕ {gap.count} lines</button>
+														</td>
+													</tr>
+												{/if}
+											{/if}
+											<tr class="hunk-row">
+												<td class="ln ln-old" colspan="2"></td>
+												<td class="hunk-header" colspan="2">
+													<span class="hunk-at">@@</span>
+													{hunk.header.slice(2).replace(/@@$/, '').trim()}
+													{#if hunk.context}
+														<span class="hunk-ctx">{hunk.context}</span>
+													{/if}
+												</td>
+											</tr>
+											{#each hunk.lines as line, i (i)}
+												<tr class="diff-row {line.type}">
+													<td class="ln ln-old">{line.oldNum ?? ''}</td>
+													<td class="ln ln-new">{line.newNum ?? ''}</td>
+													<td class="diff-sign">
+														{#if line.type === 'add'}+{:else if line.type === 'remove'}-{:else}&nbsp;{/if}
+													</td>
+													<td class="diff-content">{#each splitContent(line.content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+												</tr>
+											{/each}
+										{/each}
+									</tbody>
+								</table>
+							{/if}
 						</div>
 					{/if}
 				</div>
@@ -497,7 +746,6 @@
 		background: var(--accent-bg);
 	}
 
-	/* "This repo" also needs active state */
 	.proj-option.active {
 		background: var(--accent-bg);
 	}
@@ -874,6 +1122,33 @@
 		font-size: 0.8125rem;
 	}
 
+	/* ── Side-by-side toggle ────────────────────────────────── */
+	.sbs-toggle {
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		color: var(--text-ghost);
+		font-size: 0.875rem;
+		padding: 0.15rem 0.4rem;
+		transition:
+			background 0.15s,
+			color 0.15s,
+			border-color 0.15s;
+		line-height: 1;
+	}
+
+	.sbs-toggle:hover {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--text-2);
+	}
+
+	.sbs-toggle.active {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--accent);
+	}
+
 	/* ── Diff table ─────────────────────────────────────────── */
 	.diff-table-wrap {
 		overflow-x: auto;
@@ -989,6 +1264,149 @@
 
 	.diff-row.context .diff-content {
 		color: var(--text-dim);
+	}
+
+	/* ── Side-by-side table ─────────────────────────────────── */
+	.sbs-table {
+		table-layout: fixed;
+		width: 100%;
+		min-width: 0;
+	}
+
+	.sbs-table .ln {
+		width: 44px;
+		min-width: 44px;
+	}
+
+	.sbs-old,
+	.sbs-new {
+		white-space: pre;
+		padding: 0 0.5rem;
+		vertical-align: top;
+		overflow: hidden;
+	}
+
+	.sbs-old {
+		border-right: 1px solid var(--border-2);
+	}
+
+	.sbs-row td {
+		background: var(--bg-2);
+	}
+
+	.sbs-row .ln {
+		background: var(--bg-2);
+	}
+
+	.sbs-old.remove {
+		background: #1e0505;
+		color: #e8a0a0;
+	}
+
+	.sbs-old.context,
+	.sbs-new.context {
+		color: var(--text-dim);
+	}
+
+	.sbs-new.add {
+		background: #071507;
+		color: #9de8b0;
+	}
+
+	.sbs-old.empty,
+	.sbs-new.empty {
+		background: var(--surface);
+		opacity: 0.3;
+	}
+
+	.sbs-row .ln-old {
+		background: var(--bg-2);
+	}
+
+	.sbs-row .ln-new {
+		border-left: 1px solid var(--border-2);
+	}
+
+	/* When left is remove, tint its ln too */
+	.sbs-row:has(.sbs-old.remove) .ln-old {
+		background: #2a0808;
+		color: #8f4a4a;
+	}
+
+	/* When right is add, tint its ln too */
+	.sbs-row:has(.sbs-new.add) .ln-new {
+		background: #0a1f0a;
+		color: #4a8f5a;
+	}
+
+	/* ── Gap rows (pull-in-lines) ───────────────────────────── */
+	.gap-row {
+		cursor: pointer;
+	}
+
+	.gap-row:hover .gap-btn {
+		background: var(--surface-2);
+		color: var(--text-2);
+	}
+
+	.gap-cell {
+		padding: 0;
+		background: var(--surface);
+		border-top: 1px solid var(--border-2);
+		border-bottom: 1px solid var(--border-2);
+	}
+
+	.gap-btn {
+		display: block;
+		width: 100%;
+		background: none;
+		border: none;
+		color: var(--text-ghost);
+		font-family: 'Courier New', monospace;
+		font-size: 0.75rem;
+		padding: 0.2rem 1rem;
+		text-align: left;
+		cursor: pointer;
+		transition:
+			background 0.1s,
+			color 0.1s;
+	}
+
+	/* ── Word highlight mark ────────────────────────────────── */
+	:global(mark.hl) {
+		background: rgba(250, 220, 80, 0.28);
+		color: inherit;
+		border-radius: 2px;
+		outline: 1px solid rgba(250, 220, 80, 0.4);
+	}
+
+	/* ── Copy-ref tooltip ───────────────────────────────────── */
+	.copy-ref-tooltip {
+		position: fixed;
+		z-index: 100;
+		pointer-events: auto;
+		transform: translateX(-50%);
+	}
+
+	.copy-ref-btn {
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-2);
+		font-family: 'Courier New', monospace;
+		font-size: 0.75rem;
+		padding: 0.25rem 0.625rem;
+		white-space: nowrap;
+		box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+		transition:
+			background 0.1s,
+			color 0.1s;
+	}
+
+	.copy-ref-btn:hover {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--accent);
 	}
 
 	/* ── Shared ─────────────────────────────────────────────── */
