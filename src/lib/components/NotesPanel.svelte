@@ -91,6 +91,7 @@
 
 	function openNote(id: string) {
 		if (!openNoteIds.includes(id)) {
+			if (openNoteIds.length >= 8) return;
 			const note = notes.find((n) => n.id === id);
 			if (!note) return;
 			openNoteIds = [...openNoteIds, id];
@@ -301,28 +302,25 @@
 
 	.editors-container {
 		flex: 1;
-		display: flex;
-		flex-direction: row;
-		overflow-x: auto;
-		overflow-y: hidden;
+		display: grid;
+		grid-template-columns: 1fr 1fr;
+		grid-auto-rows: 1fr;
+		gap: 1px;
+		background: var(--border);
+		overflow: hidden;
 		min-height: 0;
-	}
-
-	.editors-container::-webkit-scrollbar {
-		height: 4px;
 	}
 
 	.note-col {
-		flex: 1;
-		min-width: 320px;
 		display: flex;
 		flex-direction: column;
-		border-right: 1px solid var(--bg-2);
+		background: var(--bg-2);
+		overflow: hidden;
 		min-height: 0;
 	}
 
-	.note-col:last-child {
-		border-right: none;
+	.note-col:last-child:nth-child(odd) {
+		grid-column: span 2;
 	}
 
 	.col-header {
@@ -368,13 +366,12 @@
 	}
 
 	.empty-state {
-		flex: 1;
+		grid-column: span 2;
 		display: flex;
 		align-items: center;
 		justify-content: center;
 		color: var(--text-faint);
 		font-size: 0.875rem;
-		width: 100%;
 	}
 
 	.index-toggle {

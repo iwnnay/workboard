@@ -54,6 +54,9 @@
 		cursor: pointer;
 		font-family: inherit;
 		font-size: inherit;
+		background: none;
+		border: none;
+		appearance: none;
 	}
 
 	:global(input, textarea) {
