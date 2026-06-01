@@ -8,7 +8,8 @@
 		{ href: '/bookmarks', label: 'Bookmarks' },
 		{ href: '/diff', label: 'Diff' },
 		{ href: '/compare', label: 'Compare' },
-		{ href: '/docs', label: 'Docs' }
+		{ href: '/docs', label: 'Docs' },
+		{ href: '/ollama', label: 'Ollama' }
 	];
 
 	function close() {
