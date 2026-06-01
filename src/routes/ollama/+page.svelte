@@ -1,10 +1,16 @@
 <script lang="ts">
+	import { SvelteSet } from 'svelte/reactivity';
+	import OllamaPullModal from '$lib/components/OllamaPullModal.svelte';
+	import { pullQueue } from '$lib/ollama-pull.svelte';
 	import type { OllamaInfo, OllamaModel, OllamaModelShow } from '../api/ollama/+server';
 
 	let host = $state('http://127.0.0.1:11434');
 	let info = $state<OllamaInfo | null>(null);
 	let loading = $state(false);
 	let selected = $state<string | null>(null);
+	let showPull = $state(false);
+	let search = $state('');
+	let activeCaps = new SvelteSet<string>();
 
 	async function load() {
 		loading = true;
@@ -22,6 +28,9 @@
 	$effect(() => {
 		void load();
 	});
+
+	// Refresh the model list whenever a queued pull finishes.
+	pullQueue.onComplete = load;
 
 	function formatSize(bytes: number | undefined): string {
 		if (!bytes) return '—';
@@ -47,6 +56,38 @@
 		return info?.running.find((m) => m.name === name);
 	}
 
+	function capsFor(name: string): string[] {
+		return info?.details[name]?.capabilities ?? [];
+	}
+
+	function toggleCap(cap: string) {
+		if (activeCaps.has(cap)) activeCaps.delete(cap);
+		else activeCaps.add(cap);
+	}
+
+	// Every capability seen across the installed models, for the filter chips.
+	let allCapabilities = $derived.by(() => {
+		const set = new Set<string>();
+		for (const m of info?.models ?? []) {
+			for (const c of capsFor(m.name)) set.add(c);
+		}
+		return [...set].sort();
+	});
+
+	// Models matching the text search and (if any) every selected capability.
+	let filteredModels = $derived.by(() => {
+		const q = search.trim().toLowerCase();
+		const caps = [...activeCaps];
+		return (info?.models ?? []).filter((m) => {
+			if (q && !m.name.toLowerCase().includes(q)) return false;
+			if (caps.length > 0) {
+				const mc = capsFor(m.name);
+				if (!caps.every((c) => mc.includes(c))) return false;
+			}
+			return true;
+		});
+	});
+
 	let selectedModel = $derived(info?.models.find((m) => m.name === selected) ?? null);
 	let selectedShow = $derived<OllamaModelShow | null>(
 		selected && info ? (info.details[selected] ?? null) : null
@@ -68,6 +109,11 @@
 		<button class="refresh-btn" onclick={() => load()} disabled={loading}>
 			{loading ? 'Loading…' : 'Refresh'}
 		</button>
+		{#if info?.reachable}
+			<button class="pull-btn" onclick={() => (showPull = true)}>
+				↓ Pull model{#if pullQueue.activeCount > 0}<span class="pull-badge">{pullQueue.activeCount}</span>{/if}
+			</button>
+		{/if}
 		{#if info}
 			<span class="status" class:ok={info.reachable} class:bad={!info.reachable}>
 				<span class="dot"></span>
@@ -88,13 +134,39 @@
 		{:else}
 			<!-- Model list -->
 			<aside class="list-panel">
+				<div class="list-controls">
+					<input
+						class="search-input"
+						bind:value={search}
+						placeholder="Filter models…"
+						spellcheck="false"
+					/>
+					{#if allCapabilities.length > 0}
+						<div class="cap-filters">
+							{#each allCapabilities as cap (cap)}
+								<button
+									class="cap-chip"
+									class:active={activeCaps.has(cap)}
+									onclick={() => toggleCap(cap)}
+								>
+									{cap}
+								</button>
+							{/each}
+							{#if activeCaps.size > 0}
+								<button class="cap-clear" onclick={() => activeCaps.clear()}>clear</button>
+							{/if}
+						</div>
+					{/if}
+				</div>
 				<div class="list-section-label">
-					Models <span class="count">{info.models.length}</span>
+					Models <span class="count">{filteredModels.length} / {info.models.length}</span>
 				</div>
 				{#if info.models.length === 0}
 					<div class="list-empty">No models installed.</div>
+				{:else if filteredModels.length === 0}
+					<div class="list-empty">No models match the filters.</div>
 				{:else}
-					{#each info.models as m (m.name)}
+					{#each filteredModels as m (m.name)}
 						<button
 							class="model-btn"
 							class:selected={selected === m.name}
@@ -247,6 +319,10 @@
 	</div>
 </div>
 
+{#if showPull}
+	<OllamaPullModal {host} onClose={() => (showPull = false)} />
+{/if}
+
 <style>
 	.ollama-page {
 		display: flex;
@@ -311,6 +387,38 @@
 	.refresh-btn:disabled {
 		opacity: 0.5;
 		cursor: default;
+	}
+
+	.pull-btn {
+		padding: 0.3rem 0.75rem;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-2);
+		font-size: 0.8125rem;
+		transition: border-color 0.15s, background 0.15s;
+	}
+
+	.pull-btn:hover {
+		border-color: var(--accent-muted);
+		background: var(--accent-bg);
+		color: var(--accent);
+	}
+
+	.pull-badge {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 1.05rem;
+		height: 1.05rem;
+		margin-left: 0.4rem;
+		padding: 0 0.3rem;
+		border-radius: 999px;
+		background: var(--accent);
+		color: var(--bg);
+		font-size: 0.7rem;
+		font-weight: 700;
+		line-height: 1;
 	}
 
 	.status {
@@ -385,6 +493,69 @@
 		background: var(--surface);
 		overflow-y: auto;
 		padding: 0.5rem 0;
+	}
+
+	.list-controls {
+		padding: 0.5rem 0.75rem;
+		border-bottom: 1px solid var(--border);
+		display: flex;
+		flex-direction: column;
+		gap: 0.5rem;
+	}
+
+	.search-input {
+		width: 100%;
+		background: var(--bg);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text);
+		font-size: 0.8125rem;
+		padding: 0.3rem 0.5rem;
+		outline: none;
+	}
+
+	.search-input:focus {
+		border-color: var(--accent-muted);
+	}
+
+	.cap-filters {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.25rem;
+		align-items: center;
+	}
+
+	.cap-chip {
+		font-size: 0.7rem;
+		font-family: monospace;
+		padding: 0.1rem 0.4rem;
+		border-radius: 4px;
+		border: 1px solid var(--border);
+		background: var(--surface-2);
+		color: var(--text-dim);
+		transition: border-color 0.1s, color 0.1s, background 0.1s;
+	}
+
+	.cap-chip:hover {
+		color: var(--text-2);
+		border-color: var(--accent-muted);
+	}
+
+	.cap-chip.active {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--accent);
+	}
+
+	.cap-clear {
+		font-size: 0.7rem;
+		color: var(--text-ghost);
+		padding: 0.1rem 0.3rem;
+		text-decoration: underline;
+	}
+
+	.cap-clear:hover {
+		color: var(--text-2);
 	}
 
 	.list-section-label {
