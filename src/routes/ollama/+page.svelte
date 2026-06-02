@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import OllamaPullModal from '$lib/components/OllamaPullModal.svelte';
+	import OllamaLogsModal from '$lib/components/OllamaLogsModal.svelte';
 	import { pullQueue } from '$lib/ollama-pull.svelte';
 	import type { OllamaInfo, OllamaModel, OllamaModelShow } from '../api/ollama/+server';
 
@@ -9,6 +10,7 @@
 	let loading = $state(false);
 	let selected = $state<string | null>(null);
 	let showPull = $state(false);
+	let showLogs = $state(false);
 	let search = $state('');
 	let activeCaps = new SvelteSet<string>();
 
@@ -109,6 +111,7 @@
 		<button class="refresh-btn" onclick={() => load()} disabled={loading}>
 			{loading ? 'Loading…' : 'Refresh'}
 		</button>
+		<button class="logs-btn" onclick={() => (showLogs = true)}>≡ Logs</button>
 		{#if info?.reachable}
 			<button class="pull-btn" onclick={() => (showPull = true)}>
 				↓ Pull model{#if pullQueue.activeCount > 0}<span class="pull-badge">{pullQueue.activeCount}</span>{/if}
@@ -323,6 +326,10 @@
 	<OllamaPullModal {host} onClose={() => (showPull = false)} />
 {/if}
 
+{#if showLogs}
+	<OllamaLogsModal onClose={() => (showLogs = false)} />
+{/if}
+
 <style>
 	.ollama-page {
 		display: flex;
@@ -389,7 +396,8 @@
 		cursor: default;
 	}
 
-	.pull-btn {
+	.pull-btn,
+	.logs-btn {
 		padding: 0.3rem 0.75rem;
 		background: var(--surface-2);
 		border: 1px solid var(--border);
@@ -399,7 +407,8 @@
 		transition: border-color 0.15s, background 0.15s;
 	}
 
-	.pull-btn:hover {
+	.pull-btn:hover,
+	.logs-btn:hover {
 		border-color: var(--accent-muted);
 		background: var(--accent-bg);
 		color: var(--accent);
