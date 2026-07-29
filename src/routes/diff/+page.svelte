@@ -4,7 +4,8 @@
 	import type { Project } from '$lib/types';
 	import { untrack, onMount } from 'svelte';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
-	import { goto } from '$app/navigation';
+	import { goto, invalidate } from '$app/navigation';
+	import FileEditor from '$lib/components/FileEditor.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -25,6 +26,8 @@
 
 	// Diff view features
 	let sideBySide = $state(false);
+	let editing = $state(false);
+	let editorDirty = $state(false);
 	let highlightWord = $state('');
 	let copyRef = $state<{ x: number; y: number; ref: string } | null>(null);
 	let expandedGaps = new SvelteMap<string, string[]>();
@@ -123,6 +126,35 @@
 			}
 		});
 	});
+
+	// ── File editing ─────────────────────────────────────────
+
+	function closeEditor() {
+		editing = false;
+		editorDirty = false;
+		void invalidate('diff:data');
+	}
+
+	function handleEditorClose() {
+		closeEditor();
+	}
+
+	function toggleEditing() {
+		if (!editing) {
+			editing = true;
+			return;
+		}
+		if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) return;
+		closeEditor();
+	}
+
+	function selectFile(path: string) {
+		if (editing) {
+			if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) return;
+			closeEditor();
+		}
+		_selectedPath = path;
+	}
 
 	// ── Navigation (continued) ───────────────────────────────
 
@@ -243,7 +275,7 @@
 		const curr = file.hunks[hunkIdx];
 		const lastNew = [...prev.lines].reverse().find((l) => l.newNum !== null)?.newNum;
 		const firstNew = curr.lines.find((l) => l.newNum !== null)?.newNum;
-		if (lastNew === undefined || firstNew === undefined || firstNew <= lastNew + 1) return null;
+		if (lastNew == null || firstNew == null || firstNew <= lastNew + 1) return null;
 		return { newStart: lastNew + 1, newEnd: firstNew - 1, count: firstNew - lastNew - 1 };
 	}
 
@@ -285,6 +317,7 @@
 	}
 
 	function handleDiffMouseUp(e: MouseEvent) {
+		if (editing) return;
 		const sel = window.getSelection();
 		const text = sel?.toString().trim() ?? '';
 
@@ -334,6 +367,19 @@
 		setTimeout(() => {
 			if (copyRef?.ref === '✓ copied') copyRef = null;
 		}, 1200);
+	}
+
+	// ── Copy file path ────────────────────────────────────────
+
+	let pathCopied = $state(false);
+	let pathCopiedTimer: ReturnType<typeof setTimeout> | undefined;
+
+	async function copyFilePath() {
+		if (!activeFile) return;
+		await navigator.clipboard.writeText(activeFile.path);
+		pathCopied = true;
+		clearTimeout(pathCopiedTimer);
+		pathCopiedTimer = setTimeout(() => (pathCopied = false), 1200);
 	}
 </script>
 
@@ -471,8 +517,8 @@
 							class:is-reviewed={reviewed.has(file.path)}
 							role="button"
 							tabindex="0"
-							onclick={() => (_selectedPath = file.path)}
-							onkeydown={(e) => e.key === 'Enter' && (_selectedPath = file.path)}
+							onclick={() => selectFile(file.path)}
+							onkeydown={(e) => e.key === 'Enter' && selectFile(file.path)}
 							title={file.path}
 						>
 							<span class="file-name">
@@ -512,7 +558,7 @@
 
 		<!-- Right: diff view -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-		<main class="diff-panel" onmouseup={handleDiffMouseUp}>
+		<main class="diff-panel" class:editing onmouseup={handleDiffMouseUp}>
 			{#if !activeFile}
 				<div class="diff-empty">
 					{#if data.error}
@@ -524,11 +570,20 @@
 			{:else}
 				<div class="diff-file">
 					<div class="diff-file-header">
-						<span class="diff-file-path">
-							{#if fileDir(activeFile.path)}
-								<span class="diff-file-dir">{fileDir(activeFile.path)}/</span>
-							{/if}
-							<span class="diff-file-name">{fileLabel(activeFile.path)}</span>
+						<span class="diff-file-title">
+							<span class="diff-file-path">
+								{#if fileDir(activeFile.path)}
+									<span class="diff-file-dir">{fileDir(activeFile.path)}/</span>
+								{/if}
+								<span class="diff-file-name">{fileLabel(activeFile.path)}</span>
+							</span>
+							<button
+								class="copy-path-btn"
+								class:copied={pathCopied}
+								onclick={copyFilePath}
+								title="Copy file path"
+								aria-label="Copy file path"
+							>{pathCopied ? '✓' : '⧉'}</button>
 						</span>
 						<span class="diff-file-meta">
 							{#if activeFile.isUntracked}<span class="badge untracked">untracked</span>{:else if activeFile.isNew}<span class="badge new">new file</span>{/if}
@@ -550,10 +605,28 @@
 									title="Toggle side-by-side"
 								>⇔</button>
 							{/if}
+							{#if !activeFile.isBinary && !activeFile.isDeleted}
+								<button
+									class="sbs-toggle"
+									class:active={editing}
+									onclick={toggleEditing}
+									title="Edit file (Vim)"
+								>✎</button>
+							{/if}
 						</span>
 					</div>
 
-					{#if activeFile.isBinary}
+					{#if editing}
+						{#key activeFile.path}
+							<FileEditor
+								projectId={data.projectId}
+								filePath={activeFile.path}
+								range={data.range}
+								bind:dirty={editorDirty}
+								onClose={handleEditorClose}
+							/>
+						{/key}
+					{:else if activeFile.isBinary}
 						<div class="binary-notice">Binary file changed</div>
 					{:else if activeFile.hunks.length === 0}
 						<div class="binary-notice">No textual changes</div>
@@ -1111,6 +1184,21 @@
 		background: var(--bg-2);
 	}
 
+	/* While the file editor is open it owns scrolling, so the panel becomes
+	   a fixed-height flex column instead of a scroll container. */
+	.diff-panel.editing {
+		overflow: hidden;
+		display: flex;
+		flex-direction: column;
+	}
+
+	.diff-panel.editing .diff-file {
+		flex: 1;
+		min-height: 0;
+		display: flex;
+		flex-direction: column;
+	}
+
 	.diff-empty {
 		display: flex;
 		align-items: center;
@@ -1154,6 +1242,34 @@
 		position: sticky;
 		top: 0;
 		z-index: 5;
+	}
+
+	.diff-file-title {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		min-width: 0;
+	}
+
+	.copy-path-btn {
+		flex-shrink: 0;
+		background: none;
+		border: none;
+		color: var(--text-ghost);
+		font-size: 0.8125rem;
+		padding: 0.1rem 0.25rem;
+		border-radius: 3px;
+		line-height: 1;
+		cursor: pointer;
+		transition: color 0.1s;
+	}
+
+	.copy-path-btn:hover {
+		color: var(--accent);
+	}
+
+	.copy-path-btn.copied {
+		color: #4ade80;
 	}
 
 	.diff-file-path {
