@@ -61,9 +61,70 @@
 				goto(`/diff?${params.toString()}`, { replaceState: true });
 			}
 		}
-		reviewed.clear();
 		expandedGaps.clear();
 	});
+
+	// ── Reviewed persistence ─────────────────────────────────
+
+	function reviewedStorageKey(projectId: string) {
+		return `diff_reviewed_${projectId || 'default'}`;
+	}
+
+	function fileFingerprint(file: DiffFile): string {
+		const content = file.hunks
+			.map(
+				(hunk) => `${hunk.header}\n${hunk.lines.map((line) => line.type + line.content).join('\n')}`
+			)
+			.join('\n');
+		// FNV-1a
+		let hash = 0x811c9dc5;
+		for (let charIndex = 0; charIndex < content.length; charIndex++) {
+			hash ^= content.charCodeAt(charIndex);
+			hash = Math.imul(hash, 0x01000193);
+		}
+		return `${(hash >>> 0).toString(36)}:${file.additions}:${file.deletions}`;
+	}
+
+	function readStoredFingerprints(storageKey: string): Record<string, string> {
+		try {
+			const parsed = JSON.parse(localStorage.getItem(storageKey) ?? '{}');
+			return parsed && typeof parsed === 'object' ? parsed : {};
+		} catch {
+			return {};
+		}
+	}
+
+	function persistReviewed() {
+		const storageKey = reviewedStorageKey(data.projectId);
+		const storedFingerprints = readStoredFingerprints(storageKey);
+		for (const file of data.files) {
+			if (reviewed.has(file.path)) storedFingerprints[file.path] = fileFingerprint(file);
+			else delete storedFingerprints[file.path];
+		}
+		localStorage.setItem(storageKey, JSON.stringify(storedFingerprints));
+	}
+
+	function toggleReviewed(path: string) {
+		if (reviewed.has(path)) reviewed.delete(path);
+		else reviewed.add(path);
+		persistReviewed();
+	}
+
+	// Restore checkmarks whenever a diff loads; a file stays checked only if
+	// its diff content is unchanged since it was checked.
+	$effect(() => {
+		const currentFiles = data.files;
+		const storageKey = reviewedStorageKey(data.projectId);
+		untrack(() => {
+			reviewed.clear();
+			const storedFingerprints = readStoredFingerprints(storageKey);
+			for (const file of currentFiles) {
+				if (storedFingerprints[file.path] === fileFingerprint(file)) reviewed.add(file.path);
+			}
+		});
+	});
+
+	// ── Navigation (continued) ───────────────────────────────
 
 	function navigate(projectId: string, range: string) {
 		localStorage.setItem('diff_projectId', projectId);
@@ -439,8 +500,7 @@
 								class:done={reviewed.has(file.path)}
 								onclick={(e) => {
 									e.stopPropagation();
-									if (reviewed.has(file.path)) reviewed.delete(file.path);
-									else reviewed.add(file.path);
+									toggleReviewed(file.path);
 								}}
 								aria-label="Mark as reviewed"
 							>✓</button>
@@ -509,7 +569,7 @@
 										<col style="width: calc(50% - 44px)" />
 									</colgroup>
 									<tbody>
-										{#each activeFile.hunks as hunk, hunkIdx}
+										{#each activeFile.hunks as hunk, hunkIdx (hunkIdx)}
 											{@const gap = getGapBefore(activeFile, hunkIdx)}
 											{#if gap}
 												{@const key = gapKey(activeFile.path, hunkIdx)}
@@ -564,7 +624,7 @@
 								<!-- Unified view -->
 								<table class="diff-table">
 									<tbody>
-										{#each activeFile.hunks as hunk, hunkIdx}
+										{#each activeFile.hunks as hunk, hunkIdx (hunkIdx)}
 											{@const gap = getGapBefore(activeFile, hunkIdx)}
 											{#if gap}
 												{@const key = gapKey(activeFile.path, hunkIdx)}
