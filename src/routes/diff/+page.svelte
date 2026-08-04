@@ -153,6 +153,7 @@
 			if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) return;
 			closeEditor();
 		}
+		if (path !== selectedPath) resetStageState();
 		_selectedPath = path;
 	}
 
@@ -381,6 +382,84 @@
 		clearTimeout(pathCopiedTimer);
 		pathCopiedTimer = setTimeout(() => (pathCopied = false), 1200);
 	}
+
+	// ── Stage file (git add) ──────────────────────────────────
+
+	let stageState = $state<'idle' | 'pending' | 'staged' | 'error'>('idle');
+	let stageError = $state('');
+	let stageResetTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function resetStageState() {
+		clearTimeout(stageResetTimer);
+		stageState = 'idle';
+		stageError = '';
+	}
+
+	async function stageFile() {
+		if (!activeFile || stageState === 'pending') return;
+		const stagedPath = activeFile.path;
+		clearTimeout(stageResetTimer);
+		stageState = 'pending';
+		stageError = '';
+		try {
+			const response = await fetch('/api/diff/stage', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId: data.projectId, path: stagedPath })
+			});
+			const payload = await response.json();
+			if (!response.ok) {
+				throw new Error(
+					payload.error ??
+						`staging file "${stagedPath}": request failed with status ${response.status}`
+				);
+			}
+			stageState = 'staged';
+			stageResetTimer = setTimeout(resetStageState, 1500);
+		} catch (caught) {
+			stageState = 'error';
+			stageError = (caught as Error).message;
+			stageResetTimer = setTimeout(resetStageState, 4000);
+		}
+	}
+
+	// ── Stage all (git add .) ─────────────────────────────────
+
+	let stageAllState = $state<'idle' | 'pending' | 'staged' | 'error'>('idle');
+	let stageAllError = $state('');
+	let stageAllResetTimer: ReturnType<typeof setTimeout> | undefined;
+
+	function resetStageAllState() {
+		clearTimeout(stageAllResetTimer);
+		stageAllState = 'idle';
+		stageAllError = '';
+	}
+
+	async function stageAllFiles() {
+		if (stageAllState === 'pending') return;
+		clearTimeout(stageAllResetTimer);
+		stageAllState = 'pending';
+		stageAllError = '';
+		try {
+			const response = await fetch('/api/diff/stage', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ projectId: data.projectId, all: true })
+			});
+			const payload = await response.json();
+			if (!response.ok) {
+				throw new Error(
+					payload.error ?? `staging all changes: request failed with status ${response.status}`
+				);
+			}
+			stageAllState = 'staged';
+			stageAllResetTimer = setTimeout(resetStageAllState, 1500);
+		} catch (caught) {
+			stageAllState = 'error';
+			stageAllError = (caught as Error).message;
+			stageAllResetTimer = setTimeout(resetStageAllState, 4000);
+		}
+	}
 </script>
 
 <!-- Close dropdown on backdrop click -->
@@ -486,6 +565,21 @@
 				Run
 			{/if}
 		</button>
+
+		<button
+			class="stage-btn topbar-stage-btn"
+			class:staged={stageAllState === 'staged'}
+			class:error={stageAllState === 'error'}
+			disabled={stageAllState === 'pending'}
+			onclick={stageAllFiles}
+			title={stageAllState === 'error' ? stageAllError : 'git add .'}
+		>{stageAllState === 'staged'
+			? '✓ Staged'
+			: stageAllState === 'error'
+				? 'Error'
+				: stageAllState === 'pending'
+					? '…'
+					: 'Stage all'}</button>
 
 		{#if data.error}
 			<span class="error-badge" title={data.error}>Error</span>
@@ -613,6 +707,20 @@
 									title="Edit file (Vim)"
 								>✎</button>
 							{/if}
+							<button
+								class="stage-btn"
+								class:staged={stageState === 'staged'}
+								class:error={stageState === 'error'}
+								disabled={stageState === 'pending'}
+								onclick={stageFile}
+								title={stageState === 'error' ? stageError : `git add ${activeFile.path}`}
+							>{stageState === 'staged'
+								? '✓ Staged'
+								: stageState === 'error'
+									? 'Error'
+									: stageState === 'pending'
+										? '…'
+										: 'Stage'}</button>
 						</span>
 					</div>
 
@@ -1323,6 +1431,52 @@
 		background: var(--accent-bg);
 		border-color: var(--accent-muted);
 		color: var(--accent);
+	}
+
+	/* ── Stage buttons ──────────────────────────────────────── */
+	.stage-btn {
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		color: var(--text-ghost);
+		font-size: 0.75rem;
+		padding: 0.15rem 0.5rem;
+		line-height: 1.4;
+		white-space: nowrap;
+		transition:
+			background 0.15s,
+			color 0.15s,
+			border-color 0.15s;
+	}
+
+	.stage-btn:hover:not(:disabled) {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--text-2);
+	}
+
+	.stage-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+
+	.stage-btn.staged {
+		border-color: #0a1f0a;
+		background: #071507;
+		color: #4ade80;
+	}
+
+	.stage-btn.error {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
+		color: var(--accent);
+	}
+
+	.topbar-stage-btn {
+		flex-shrink: 0;
+		font-size: 0.8125rem;
+		padding: 0.3rem 0.625rem;
+		border-radius: 5px;
 	}
 
 	/* ── Diff table ─────────────────────────────────────────── */
