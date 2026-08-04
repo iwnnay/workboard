@@ -41,7 +41,10 @@
 	async function commitRename() {
 		if (!folder || !onSaveFolderName) return;
 		const trimmed = nameDraft.trim();
-		if (!trimmed) { renaming = false; return; }
+		if (!trimmed) {
+			renaming = false;
+			return;
+		}
 		await onSaveFolderName(folder.id, trimmed);
 		renaming = false;
 	}
@@ -81,13 +84,41 @@
 						if (e.key === 'Escape') renaming = false;
 					}}
 				/>
-				<button class="icon-btn" onclick={(e) => { e.stopPropagation(); commitRename(); }} aria-label="Save name">✓</button>
-				<button class="icon-btn" onclick={(e) => { e.stopPropagation(); renaming = false; }} aria-label="Cancel rename">✗</button>
+				<button
+					class="icon-btn"
+					onclick={(e) => {
+						e.stopPropagation();
+						commitRename();
+					}}
+					aria-label="Save name">✓</button
+				>
+				<button
+					class="icon-btn"
+					onclick={(e) => {
+						e.stopPropagation();
+						renaming = false;
+					}}
+					aria-label="Cancel rename">✗</button
+				>
 			{:else}
 				<span class="folder-name">{folder.name}</span>
 				<div class="folder-actions">
-					<button class="icon-btn" onclick={(e) => { e.stopPropagation(); startRename(); }} aria-label="Rename folder">✎</button>
-					<button class="icon-btn del" onclick={(e) => { e.stopPropagation(); onDeleteFolder?.(folder.id); }} aria-label="Delete folder">×</button>
+					<button
+						class="icon-btn"
+						onclick={(e) => {
+							e.stopPropagation();
+							startRename();
+						}}
+						aria-label="Rename folder">✎</button
+					>
+					<button
+						class="icon-btn del"
+						onclick={(e) => {
+							e.stopPropagation();
+							onDeleteFolder?.(folder.id);
+						}}
+						aria-label="Delete folder">×</button
+					>
 				</div>
 			{/if}
 		</div>
@@ -135,9 +166,15 @@
 		user-select: none;
 		transition: background 0.1s;
 	}
-	.folder-header:hover { background: var(--surface-2); }
-	.folder-header.ungrouped { cursor: default; }
-	.folder-header.ungrouped:hover { background: var(--surface); }
+	.folder-header:hover {
+		background: var(--surface-2);
+	}
+	.folder-header.ungrouped {
+		cursor: default;
+	}
+	.folder-header.ungrouped:hover {
+		background: var(--surface);
+	}
 
 	.chevron {
 		color: var(--text-dim);
@@ -147,7 +184,9 @@
 		transition: transform 0.15s;
 		flex-shrink: 0;
 	}
-	.chevron.collapsed { transform: rotate(-90deg); }
+	.chevron.collapsed {
+		transform: rotate(-90deg);
+	}
 
 	.folder-name {
 		flex: 1;
@@ -155,7 +194,10 @@
 		font-weight: 500;
 		color: var(--text-2);
 	}
-	.folder-name.muted { color: var(--text-dim); font-weight: 400; }
+	.folder-name.muted {
+		color: var(--text-dim);
+		font-weight: 400;
+	}
 
 	.folder-name-input {
 		flex: 1;
@@ -169,7 +211,9 @@
 		font-weight: 500;
 		transition: border-color 0.15s;
 	}
-	.folder-name-input:focus { border-color: var(--accent); }
+	.folder-name-input:focus {
+		border-color: var(--accent);
+	}
 
 	.folder-actions {
 		display: flex;
@@ -177,9 +221,13 @@
 		opacity: 0;
 		transition: opacity 0.1s;
 	}
-	.folder-header:hover .folder-actions { opacity: 1; }
+	.folder-header:hover .folder-actions {
+		opacity: 1;
+	}
 
-	.folder-content { border-top: 1px solid var(--border-2); }
+	.folder-content {
+		border-top: 1px solid var(--border-2);
+	}
 
 	.icon-btn {
 		background: none;
@@ -190,10 +238,18 @@
 		border-radius: 3px;
 		line-height: 1;
 		flex-shrink: 0;
-		transition: color 0.1s, background 0.1s;
+		transition:
+			color 0.1s,
+			background 0.1s;
 	}
-	.icon-btn:hover { color: var(--text-2); background: var(--surface-2); }
-	.icon-btn.del:hover { color: var(--accent); background: var(--accent-bg); }
+	.icon-btn:hover {
+		color: var(--text-2);
+		background: var(--surface-2);
+	}
+	.icon-btn.del:hover {
+		color: var(--accent);
+		background: var(--accent-bg);
+	}
 
 	.add-bookmark-btn {
 		display: block;
@@ -204,7 +260,12 @@
 		color: var(--text-ghost);
 		font-size: 0.8125rem;
 		text-align: left;
-		transition: color 0.1s, background 0.1s;
+		transition:
+			color 0.1s,
+			background 0.1s;
 	}
-	.add-bookmark-btn:hover { color: var(--text-muted); background: var(--surface); }
+	.add-bookmark-btn:hover {
+		color: var(--text-muted);
+		background: var(--surface);
+	}
 </style>

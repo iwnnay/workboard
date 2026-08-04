@@ -82,11 +82,20 @@
 				autofocus
 				onkeydown={(e) => {
 					if (e.key === 'Enter') createFolder();
-					if (e.key === 'Escape') { showAddFolder = false; newFolderName = ''; }
+					if (e.key === 'Escape') {
+						showAddFolder = false;
+						newFolderName = '';
+					}
 				}}
 			/>
 			<button class="btn-confirm" onclick={createFolder}>Add</button>
-			<button class="btn-cancel" onclick={() => { showAddFolder = false; newFolderName = ''; }}>Cancel</button>
+			<button
+				class="btn-cancel"
+				onclick={() => {
+					showAddFolder = false;
+					newFolderName = '';
+				}}>Cancel</button
+			>
 		</div>
 	{/if}
 
@@ -144,7 +153,10 @@
 		color: var(--text-muted);
 		padding: 0.35rem 0.75rem;
 		font-size: 0.8125rem;
-		transition: color 0.15s, border-color 0.15s, background 0.15s;
+		transition:
+			color 0.15s,
+			border-color 0.15s,
+			background 0.15s;
 	}
 	.add-folder-btn:hover {
 		color: var(--accent);
@@ -173,7 +185,9 @@
 		outline: none;
 		transition: border-color 0.15s;
 	}
-	.folder-name-input:focus { border-color: var(--accent); }
+	.folder-name-input:focus {
+		border-color: var(--accent);
+	}
 
 	.tree {
 		display: flex;
@@ -191,7 +205,10 @@
 		transition: background 0.15s;
 		flex-shrink: 0;
 	}
-	.btn-confirm:hover { background: var(--accent-muted); color: var(--text); }
+	.btn-confirm:hover {
+		background: var(--accent-muted);
+		color: var(--text);
+	}
 
 	.btn-cancel {
 		background: none;
@@ -200,8 +217,13 @@
 		color: var(--text-dim);
 		padding: 0.375rem 0.75rem;
 		font-size: 0.8125rem;
-		transition: color 0.15s, border-color 0.15s;
+		transition:
+			color 0.15s,
+			border-color 0.15s;
 		flex-shrink: 0;
 	}
-	.btn-cancel:hover { color: var(--text-muted); border-color: var(--text-dim); }
+	.btn-cancel:hover {
+		color: var(--text-muted);
+		border-color: var(--text-dim);
+	}
 </style>

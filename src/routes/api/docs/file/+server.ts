@@ -23,7 +23,11 @@ export const GET: RequestHandler = async ({ url }) => {
 	if (!abs.startsWith(resolve(root))) return json({ error: 'forbidden' }, { status: 403 });
 
 	let content: string;
-	try { content = readFileSync(abs, 'utf-8'); } catch { return json({ error: 'not found' }, { status: 404 }); }
+	try {
+		content = readFileSync(abs, 'utf-8');
+	} catch {
+		return json({ error: 'not found' }, { status: 404 });
+	}
 
 	if (content.includes('\0')) return json({ error: 'binary file' }, { status: 415 });
 
@@ -31,10 +35,14 @@ export const GET: RequestHandler = async ({ url }) => {
 	const lineCount = content.split('\n').length;
 	const parsed = parseFile(abs);
 
-	const hljsLang = parsed.language === 'svelte' ? 'xml'
-		: parsed.language === 'tsx' ? 'typescript'
-		: hljs.getLanguage(parsed.language) ? parsed.language
-		: 'plaintext';
+	const hljsLang =
+		parsed.language === 'svelte'
+			? 'xml'
+			: parsed.language === 'tsx'
+				? 'typescript'
+				: hljs.getLanguage(parsed.language)
+					? parsed.language
+					: 'plaintext';
 
 	let highlighted: string;
 	try {
@@ -43,7 +51,14 @@ export const GET: RequestHandler = async ({ url }) => {
 		highlighted = escapeHtml(content);
 	}
 
-	return json({ path: filePath, language: parsed.language, lineCount, byteSize: st.size, highlighted, parsed });
+	return json({
+		path: filePath,
+		language: parsed.language,
+		lineCount,
+		byteSize: st.size,
+		highlighted,
+		parsed
+	});
 };
 
 function escapeHtml(s: string): string {

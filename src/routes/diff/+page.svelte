@@ -203,7 +203,13 @@
 	// ── Helpers ──────────────────────────────────────────────
 
 	function deriveName(path: string) {
-		return path.replace(/[/\\]+$/, '').split(/[/\\]/).filter(Boolean).at(-1) ?? path;
+		return (
+			path
+				.replace(/[/\\]+$/, '')
+				.split(/[/\\]/)
+				.filter(Boolean)
+				.at(-1) ?? path
+		);
 	}
 
 	function fileLabel(path: string) {
@@ -354,8 +360,7 @@
 			return;
 		}
 
-		const lineRef =
-			a !== b && b !== null ? `${Math.min(a, b)}-${Math.max(a, b)}` : String(a);
+		const lineRef = a !== b && b !== null ? `${Math.min(a, b)}-${Math.max(a, b)}` : String(a);
 
 		copyRef = { x: e.clientX, y: e.clientY, ref: `${activeFile.path}:${lineRef}` };
 	}
@@ -520,8 +525,8 @@
 								<button
 									class="proj-del"
 									onclick={(e) => deleteProject(p.id, e)}
-									aria-label="Remove project"
-								>×</button>
+									aria-label="Remove project">×</button
+								>
 							</div>
 						{/each}
 					{/if}
@@ -555,7 +560,7 @@
 		/>
 		<button
 			class="run-btn"
-			class:loading={loading}
+			class:loading
 			disabled={loading}
 			onclick={() => navigate(selectedProjectId, rangeInput)}
 		>
@@ -573,13 +578,14 @@
 			disabled={stageAllState === 'pending'}
 			onclick={stageAllFiles}
 			title={stageAllState === 'error' ? stageAllError : 'git add .'}
-		>{stageAllState === 'staged'
-			? '✓ Staged'
-			: stageAllState === 'error'
-				? 'Error'
-				: stageAllState === 'pending'
-					? '…'
-					: 'Stage all'}</button>
+			>{stageAllState === 'staged'
+				? '✓ Staged'
+				: stageAllState === 'error'
+					? 'Error'
+					: stageAllState === 'pending'
+						? '…'
+						: 'Stage all'}</button
+		>
 
 		{#if data.error}
 			<span class="error-badge" title={data.error}>Error</span>
@@ -620,7 +626,8 @@
 									<span class="file-dir">{fileDir(file.path)}/</span>
 								{/if}
 								{fileLabel(file.path)}
-								{#if file.isUntracked}<span class="badge untracked">U</span>{:else if file.isNew}<span class="badge new">N</span>{/if}
+								{#if file.isUntracked}<span class="badge untracked">U</span
+									>{:else if file.isNew}<span class="badge new">N</span>{/if}
 								{#if file.isDeleted}<span class="badge del">D</span>{/if}
 							</span>
 							<span class="file-stats">
@@ -642,8 +649,8 @@
 									e.stopPropagation();
 									toggleReviewed(file.path);
 								}}
-								aria-label="Mark as reviewed"
-							>✓</button>
+								aria-label="Mark as reviewed">✓</button
+							>
 						</div>
 					{/each}
 				{/if}
@@ -676,11 +683,12 @@
 								class:copied={pathCopied}
 								onclick={copyFilePath}
 								title="Copy file path"
-								aria-label="Copy file path"
-							>{pathCopied ? '✓' : '⧉'}</button>
+								aria-label="Copy file path">{pathCopied ? '✓' : '⧉'}</button
+							>
 						</span>
 						<span class="diff-file-meta">
-							{#if activeFile.isUntracked}<span class="badge untracked">untracked</span>{:else if activeFile.isNew}<span class="badge new">new file</span>{/if}
+							{#if activeFile.isUntracked}<span class="badge untracked">untracked</span
+								>{:else if activeFile.isNew}<span class="badge new">new file</span>{/if}
 							{#if activeFile.isDeleted}<span class="badge del">deleted</span>{/if}
 							{#if !activeFile.isBinary}
 								<span class="stat-add">+{activeFile.additions}</span>
@@ -696,16 +704,16 @@
 									class="sbs-toggle"
 									class:active={sideBySide}
 									onclick={() => (sideBySide = !sideBySide)}
-									title="Toggle side-by-side"
-								>⇔</button>
+									title="Toggle side-by-side">⇔</button
+								>
 							{/if}
 							{#if !activeFile.isBinary && !activeFile.isDeleted}
 								<button
 									class="sbs-toggle"
 									class:active={editing}
 									onclick={toggleEditing}
-									title="Edit file (Vim)"
-								>✎</button>
+									title="Edit file (Vim)">✎</button
+								>
 							{/if}
 							<button
 								class="stage-btn"
@@ -714,13 +722,14 @@
 								disabled={stageState === 'pending'}
 								onclick={stageFile}
 								title={stageState === 'error' ? stageError : `git add ${activeFile.path}`}
-							>{stageState === 'staged'
-								? '✓ Staged'
-								: stageState === 'error'
-									? 'Error'
-									: stageState === 'pending'
-										? '…'
-										: 'Stage'}</button>
+								>{stageState === 'staged'
+									? '✓ Staged'
+									: stageState === 'error'
+										? 'Error'
+										: stageState === 'pending'
+											? '…'
+											: 'Stage'}</button
+							>
 						</span>
 					</div>
 
@@ -759,9 +768,17 @@
 													{#each expanded as content, i (i)}
 														<tr class="diff-row context">
 															<td class="ln ln-old">{gap.newStart + i}</td>
-															<td class="diff-content sbs-old context">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+															<td class="diff-content sbs-old context"
+																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
+																			class="hl">{part.text}</mark
+																		>{:else}{part.text}{/if}{/each}</td
+															>
 															<td class="ln ln-new">{gap.newStart + i}</td>
-															<td class="diff-content sbs-new context">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+															<td class="diff-content sbs-new context"
+																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
+																			class="hl">{part.text}</mark
+																		>{:else}{part.text}{/if}{/each}</td
+															>
 														</tr>
 													{/each}
 												{:else}
@@ -785,17 +802,17 @@
 											{#each computeSideBySide(hunk.lines) as row, i (i)}
 												<tr class="diff-row sbs-row">
 													<td class="ln ln-old">{row.left?.oldNum ?? ''}</td>
-													<td
-														class="diff-content sbs-old {row.left
-															? row.left.type
-															: 'empty'}"
-													>{#each splitContent(row.left?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+													<td class="diff-content sbs-old {row.left ? row.left.type : 'empty'}"
+														>{#each splitContent(row.left?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark
+																	class="hl">{part.text}</mark
+																>{:else}{part.text}{/if}{/each}</td
+													>
 													<td class="ln ln-new">{row.right?.newNum ?? ''}</td>
-													<td
-														class="diff-content sbs-new {row.right
-															? row.right.type
-															: 'empty'}"
-													>{#each splitContent(row.right?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+													<td class="diff-content sbs-new {row.right ? row.right.type : 'empty'}"
+														>{#each splitContent(row.right?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark
+																	class="hl">{part.text}</mark
+																>{:else}{part.text}{/if}{/each}</td
+													>
 												</tr>
 											{/each}
 										{/each}
@@ -816,7 +833,11 @@
 															<td class="ln ln-old">{gap.newStart + i}</td>
 															<td class="ln ln-new">{gap.newStart + i}</td>
 															<td class="diff-sign">&nbsp;</td>
-															<td class="diff-content">{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+															<td class="diff-content"
+																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
+																			class="hl">{part.text}</mark
+																		>{:else}{part.text}{/if}{/each}</td
+															>
 														</tr>
 													{/each}
 												{:else}
@@ -844,7 +865,11 @@
 													<td class="diff-sign">
 														{#if line.type === 'add'}+{:else if line.type === 'remove'}-{:else}&nbsp;{/if}
 													</td>
-													<td class="diff-content">{#each splitContent(line.content, highlightWord) as part, j (j)}{#if part.hl}<mark class="hl">{part.text}</mark>{:else}{part.text}{/if}{/each}</td>
+													<td class="diff-content"
+														>{#each splitContent(line.content, highlightWord) as part, j (j)}{#if part.hl}<mark
+																	class="hl">{part.text}</mark
+																>{:else}{part.text}{/if}{/each}</td
+													>
 												</tr>
 											{/each}
 										{/each}

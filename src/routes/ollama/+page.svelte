@@ -114,7 +114,9 @@
 		<button class="logs-btn" onclick={() => (showLogs = true)}>≡ Logs</button>
 		{#if info?.reachable}
 			<button class="pull-btn" onclick={() => (showPull = true)}>
-				↓ Pull model{#if pullQueue.activeCount > 0}<span class="pull-badge">{pullQueue.activeCount}</span>{/if}
+				↓ Pull model{#if pullQueue.activeCount > 0}<span class="pull-badge"
+						>{pullQueue.activeCount}</span
+					>{/if}
 			</button>
 		{/if}
 		{#if info}
@@ -193,7 +195,9 @@
 					<div class="kv-grid">
 						<div class="kv"><span class="k">Host</span><span class="v mono">{info.host}</span></div>
 						<div class="kv">
-							<span class="k">Version</span><span class="v mono">{info.version?.version ?? '—'}</span>
+							<span class="k">Version</span><span class="v mono"
+								>{info.version?.version ?? '—'}</span
+							>
 						</div>
 						<div class="kv">
 							<span class="k">Models installed</span><span class="v">{info.models.length}</span>
@@ -228,10 +232,14 @@
 								<span class="k">Size</span><span class="v">{formatSize(selectedModel.size)}</span>
 							</div>
 							<div class="kv">
-								<span class="k">Modified</span><span class="v">{formatDate(selectedModel.modified_at)}</span>
+								<span class="k">Modified</span><span class="v"
+									>{formatDate(selectedModel.modified_at)}</span
+								>
 							</div>
 							<div class="kv">
-								<span class="k">Digest</span><span class="v mono">{shortDigest(selectedModel.digest)}</span>
+								<span class="k">Digest</span><span class="v mono"
+									>{shortDigest(selectedModel.digest)}</span
+								>
 							</div>
 							{#if selectedModel.details?.family}
 								<div class="kv">
@@ -240,12 +248,16 @@
 							{/if}
 							{#if selectedModel.details?.parameter_size}
 								<div class="kv">
-									<span class="k">Parameters</span><span class="v">{selectedModel.details.parameter_size}</span>
+									<span class="k">Parameters</span><span class="v"
+										>{selectedModel.details.parameter_size}</span
+									>
 								</div>
 							{/if}
 							{#if selectedModel.details?.quantization_level}
 								<div class="kv">
-									<span class="k">Quantization</span><span class="v">{selectedModel.details.quantization_level}</span>
+									<span class="k">Quantization</span><span class="v"
+										>{selectedModel.details.quantization_level}</span
+									>
 								</div>
 							{/if}
 							{#if selectedModel.details?.format}
@@ -404,7 +416,9 @@
 		border-radius: 5px;
 		color: var(--text-2);
 		font-size: 0.8125rem;
-		transition: border-color 0.15s, background 0.15s;
+		transition:
+			border-color 0.15s,
+			background 0.15s;
 	}
 
 	.pull-btn:hover,
@@ -542,7 +556,10 @@
 		border: 1px solid var(--border);
 		background: var(--surface-2);
 		color: var(--text-dim);
-		transition: border-color 0.1s, color 0.1s, background 0.1s;
+		transition:
+			border-color 0.1s,
+			color 0.1s,
+			background 0.1s;
 	}
 
 	.cap-chip:hover {

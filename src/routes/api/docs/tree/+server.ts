@@ -15,20 +15,68 @@ export interface TreeNode {
 }
 
 const IGNORE = new Set([
-	'node_modules', '.git', 'dist', '.svelte-kit', 'build', 'coverage',
-	'.cache', '__pycache__', '.next', '.nuxt', 'target', 'vendor',
-	'.turbo', 'out', '.output', '.vercel', '.netlify', '.pnp', '.yarn'
+	'node_modules',
+	'.git',
+	'dist',
+	'.svelte-kit',
+	'build',
+	'coverage',
+	'.cache',
+	'__pycache__',
+	'.next',
+	'.nuxt',
+	'target',
+	'vendor',
+	'.turbo',
+	'out',
+	'.output',
+	'.vercel',
+	'.netlify',
+	'.pnp',
+	'.yarn'
 ]);
 
 const CODE_EXTS = new Set([
-	'.ts', '.tsx', '.js', '.jsx', '.svelte', '.vue',
-	'.css', '.scss', '.less', '.html',
-	'.py', '.go', '.rs', '.rb', '.php', '.java', '.kt', '.swift',
-	'.c', '.cpp', '.h', '.hpp',
-	'.json', '.toml', '.yaml', '.yml', '.md', '.sql',
-	'.sh', '.bash', '.zsh', '.fish',
-	'.prisma', '.graphql', '.gql', '.proto',
-	'.env.example', '.gitignore', '.eslintrc', '.prettierrc'
+	'.ts',
+	'.tsx',
+	'.js',
+	'.jsx',
+	'.svelte',
+	'.vue',
+	'.css',
+	'.scss',
+	'.less',
+	'.html',
+	'.py',
+	'.go',
+	'.rs',
+	'.rb',
+	'.php',
+	'.java',
+	'.kt',
+	'.swift',
+	'.c',
+	'.cpp',
+	'.h',
+	'.hpp',
+	'.json',
+	'.toml',
+	'.yaml',
+	'.yml',
+	'.md',
+	'.sql',
+	'.sh',
+	'.bash',
+	'.zsh',
+	'.fish',
+	'.prisma',
+	'.graphql',
+	'.gql',
+	'.proto',
+	'.env.example',
+	'.gitignore',
+	'.eslintrc',
+	'.prettierrc'
 ]);
 
 export const GET: RequestHandler = async ({ url }) => {
@@ -48,7 +96,11 @@ function walk(root: string, rel: string, depth: number): TreeNode[] {
 	if (depth > 12) return [];
 	const abs = rel ? join(root, rel) : root;
 	let entries: string[];
-	try { entries = readdirSync(abs); } catch { return []; }
+	try {
+		entries = readdirSync(abs);
+	} catch {
+		return [];
+	}
 
 	const dirs: TreeNode[] = [];
 	const files: TreeNode[] = [];
@@ -60,7 +112,11 @@ function walk(root: string, rel: string, depth: number): TreeNode[] {
 		const relPath = rel ? `${rel}/${name}` : name;
 		const fullPath = join(root, relPath);
 		let st;
-		try { st = statSync(fullPath); } catch { continue; }
+		try {
+			st = statSync(fullPath);
+		} catch {
+			continue;
+		}
 
 		if (st.isDirectory()) {
 			dirs.push({ name, path: relPath, type: 'dir', children: walk(root, relPath, depth + 1) });

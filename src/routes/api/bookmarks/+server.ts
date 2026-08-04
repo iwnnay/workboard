@@ -10,6 +10,9 @@ export async function GET() {
 
 export async function POST({ request }) {
 	const { folderId = null, name, url, description = '' } = await request.json();
-	const [created] = await db.insert(bookmark).values({ folderId, name, url, description }).returning();
+	const [created] = await db
+		.insert(bookmark)
+		.values({ folderId, name, url, description })
+		.returning();
 	return json(created);
 }

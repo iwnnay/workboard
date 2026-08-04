@@ -98,10 +98,7 @@ describe('parseDiff', () => {
 
 	it('parses multiple hunks in one file', () => {
 		const raw = fileDiff({
-			hunks: [
-				'@@ -1,2 +1,2 @@\n-a\n+b',
-				'@@ -50,2 +50,2 @@\n-c\n+d'
-			]
+			hunks: ['@@ -1,2 +1,2 @@\n-a\n+b', '@@ -50,2 +50,2 @@\n-c\n+d']
 		});
 		const file = parseDiff(raw)[0];
 		expect(file.hunks).toHaveLength(2);

@@ -1,4 +1,5 @@
 # Diff section
+
 - [x] Add line numbers to the diff
 - [x] Add ability to pull in lines
 - [x] When I highlight a word, do a highlight on all the same words.

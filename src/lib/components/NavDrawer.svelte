@@ -9,7 +9,8 @@
 		{ href: '/diff', label: 'Diff' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/docs', label: 'Docs' },
-		{ href: '/ollama', label: 'Ollama' }
+		{ href: '/ollama', label: 'Ollama' },
+		{ href: '/servers', label: 'Servers' }
 	];
 
 	function close() {

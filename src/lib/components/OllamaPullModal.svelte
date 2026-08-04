@@ -71,7 +71,11 @@
 						<div class="item-head">
 							<span class="item-name">{item.model}</span>
 							<span class="item-status status-{item.status}">{item.statusText}</span>
-							<button class="item-action" aria-label="Remove" onclick={() => pullQueue.remove(item)}>
+							<button
+								class="item-action"
+								aria-label="Remove"
+								onclick={() => pullQueue.remove(item)}
+							>
 								{item.status === 'downloading' ? 'Cancel' : '✕'}
 							</button>
 						</div>
@@ -156,7 +160,9 @@
 		font-size: 0.85rem;
 		padding: 0.25rem 0.4rem;
 		border-radius: 4px;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.close-btn:hover {
@@ -298,7 +304,9 @@
 		font-size: 0.7rem;
 		padding: 0.1rem 0.35rem;
 		border-radius: 4px;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.item-action:hover {
@@ -372,7 +380,9 @@
 		border-radius: 5px;
 		color: var(--text-muted);
 		font-size: 0.75rem;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.clear-btn:hover:not(:disabled) {

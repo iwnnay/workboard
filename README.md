@@ -4,11 +4,11 @@ A personal dashboard built with SvelteKit, SQLite (Drizzle ORM), and Svelte 5 ru
 
 ## Features
 
-| Page | What it does |
-|---|---|
-| **Dashboard** (`/`) | Clock, to-do list, multi-column note editor, reminder scratch-pad |
-| **Bookmarks** (`/bookmarks`) | Collapsible folder tree, inline CRUD (name · URL · description) |
-| **Diff** (`/diff`) | Git diff viewer — file list, syntax-highlighted hunks, per-file stats, untracked file detection, multiple project support |
+| Page                         | What it does                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Dashboard** (`/`)          | Clock, to-do list, multi-column note editor, reminder scratch-pad                                                         |
+| **Bookmarks** (`/bookmarks`) | Collapsible folder tree, inline CRUD (name · URL · description)                                                           |
+| **Diff** (`/diff`)           | Git diff viewer — file list, syntax-highlighted hunks, per-file stats, untracked file detection, multiple project support |
 
 ## Stack
 
@@ -69,6 +69,7 @@ Run `deploy.ps1` from PowerShell in the project root:
 ```
 
 The script:
+
 1. Kills any process listening on port 7200
 2. `git pull`
 3. `yarn install --frozen-lockfile`

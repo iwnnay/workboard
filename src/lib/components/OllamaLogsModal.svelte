@@ -88,9 +88,18 @@
 				</select>
 			{/if}
 
-			<input class="search-input" bind:value={search} placeholder="Filter lines…" spellcheck="false" />
+			<input
+				class="search-input"
+				bind:value={search}
+				placeholder="Filter lines…"
+				spellcheck="false"
+			/>
 
-			<button class="toggle-btn" class:active={errorsOnly} onclick={() => (errorsOnly = !errorsOnly)}>
+			<button
+				class="toggle-btn"
+				class:active={errorsOnly}
+				onclick={() => (errorsOnly = !errorsOnly)}
+			>
 				Errors only
 			</button>
 
@@ -180,7 +189,9 @@
 		font-size: 0.85rem;
 		padding: 0.25rem 0.4rem;
 		border-radius: 4px;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.close-btn:hover {
@@ -236,7 +247,10 @@
 		border-radius: 5px;
 		color: var(--text-dim);
 		font-size: 0.8125rem;
-		transition: border-color 0.15s, background 0.15s, color 0.15s;
+		transition:
+			border-color 0.15s,
+			background 0.15s,
+			color 0.15s;
 	}
 
 	.toggle-btn:hover {

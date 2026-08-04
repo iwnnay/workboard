@@ -71,7 +71,12 @@ export function parseDiff(raw: string): DiffFile[] {
 				hunk.lines.push({ type: 'add', content: line.slice(1), oldNum: null, newNum: newLine++ });
 				file.additions++;
 			} else if (line.startsWith('-')) {
-				hunk.lines.push({ type: 'remove', content: line.slice(1), oldNum: oldLine++, newNum: null });
+				hunk.lines.push({
+					type: 'remove',
+					content: line.slice(1),
+					oldNum: oldLine++,
+					newNum: null
+				});
 				file.deletions++;
 			} else if (line.startsWith(' ') || line === '') {
 				hunk.lines.push({

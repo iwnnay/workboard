@@ -21,17 +21,20 @@
 		const dp: Uint32Array[] = Array.from({ length: m + 1 }, () => new Uint32Array(n + 1));
 		for (let i = 1; i <= m; i++) {
 			for (let j = 1; j <= n; j++) {
-				dp[i][j] = a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
+				dp[i][j] =
+					a[i - 1] === b[j - 1] ? dp[i - 1][j - 1] + 1 : Math.max(dp[i - 1][j], dp[i][j - 1]);
 			}
 		}
 
 		// Backtrack
 		const result: DiffChunk[] = [];
-		let i = m, j = n;
+		let i = m,
+			j = n;
 		while (i > 0 || j > 0) {
 			if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
 				result.unshift({ val: a[i - 1], op: 'eq' });
-				i--; j--;
+				i--;
+				j--;
 			} else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
 				result.unshift({ val: b[j - 1], op: 'ins' });
 				j--;
@@ -99,7 +102,9 @@
 		<span class="topbar-label">Compare</span>
 		<div class="topbar-actions">
 			{#if truncated}
-				<span class="trunc-badge" title="Input truncated to {MAX_TOKENS} tokens per side">Truncated</span>
+				<span class="trunc-badge" title="Input truncated to {MAX_TOKENS} tokens per side"
+					>Truncated</span
+				>
 			{/if}
 			<button class="compare-btn" onclick={compare}>Compare</button>
 		</div>
@@ -113,11 +118,7 @@
 			spellcheck="false"
 		></textarea>
 		<div class="input-divider"></div>
-		<textarea
-			class="text-input"
-			bind:value={rightText}
-			placeholder="New text…"
-			spellcheck="false"
+		<textarea class="text-input" bind:value={rightText} placeholder="New text…" spellcheck="false"
 		></textarea>
 	</div>
 
@@ -128,12 +129,20 @@
 			{:else}
 				<div class="diff-side left-side">
 					<div class="side-label">Original</div>
-					<div class="side-content" {@attach attachLeft}>{#each leftChunks as chunk, i (i)}{#if chunk.op === 'del'}<mark class="del">{chunk.val}</mark>{:else}{chunk.val}{/if}{/each}</div>
+					<div class="side-content" {@attach attachLeft}>
+						{#each leftChunks as chunk, i (i)}{#if chunk.op === 'del'}<mark class="del"
+									>{chunk.val}</mark
+								>{:else}{chunk.val}{/if}{/each}
+					</div>
 				</div>
 				<div class="side-divider"></div>
 				<div class="diff-side right-side">
 					<div class="side-label">New</div>
-					<div class="side-content" {@attach attachRight}>{#each rightChunks as chunk, i (i)}{#if chunk.op === 'ins'}<mark class="ins">{chunk.val}</mark>{:else}{chunk.val}{/if}{/each}</div>
+					<div class="side-content" {@attach attachRight}>
+						{#each rightChunks as chunk, i (i)}{#if chunk.op === 'ins'}<mark class="ins"
+									>{chunk.val}</mark
+								>{:else}{chunk.val}{/if}{/each}
+					</div>
 				</div>
 			{/if}
 		</div>

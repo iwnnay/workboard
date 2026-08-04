@@ -35,9 +35,7 @@
 				if (!note) return acc;
 				try {
 					const stored = browser ? localStorage.getItem(`draft_${id}`) : null;
-					acc[id] = stored
-						? JSON.parse(stored)
-						: { title: note.title, content: note.content };
+					acc[id] = stored ? JSON.parse(stored) : { title: note.title, content: note.content };
 				} catch {
 					acc[id] = { title: note.title, content: note.content };
 				}
@@ -211,9 +209,7 @@
 					class:is-open={openNoteIds.includes(note.id)}
 					onclick={() => openNote(note.id)}
 				>
-					<span class="popup-item-title"
-						>{drafts[note.id]?.title || note.title || 'Untitled'}</span
-					>
+					<span class="popup-item-title">{drafts[note.id]?.title || note.title || 'Untitled'}</span>
 					<span
 						class="popup-item-del"
 						role="button"
@@ -228,8 +224,8 @@
 								e.stopPropagation();
 								deleteNote(note.id);
 							}
-						}}
-					>×</span>
+						}}>×</span
+					>
 				</button>
 			{/each}
 			{#if filteredNotes.length === 0}

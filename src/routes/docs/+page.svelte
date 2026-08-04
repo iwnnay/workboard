@@ -3,7 +3,14 @@
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
 	import type { TreeNode } from '../api/docs/tree/+server';
-	import type { ParsedFile, FunctionInfo, ClassInfo, InterfaceInfo, TypeAliasInfo, ImportInfo } from '$lib/server/code-parser';
+	import type {
+		ParsedFile,
+		FunctionInfo,
+		ClassInfo,
+		InterfaceInfo,
+		TypeAliasInfo,
+		ImportInfo
+	} from '$lib/server/code-parser';
 
 	interface FileInfo {
 		path: string;
@@ -101,18 +108,37 @@
 
 	function extColor(ext: string | undefined): string {
 		switch (ext) {
-			case '.ts': case '.tsx': return '#60a5fa';
-			case '.js': case '.jsx': return '#fbbf24';
-			case '.svelte': return '#f97316';
-			case '.css': case '.scss': case '.less': return '#c084fc';
-			case '.json': case '.toml': case '.yaml': case '.yml': return '#a3e635';
-			case '.md': return '#94a3b8';
-			case '.py': return '#4ade80';
-			case '.go': return '#67e8f9';
-			case '.rs': return '#fb923c';
-			case '.sql': return '#f9a8d4';
-			case '.html': return '#f87171';
-			default: return 'var(--text-ghost)';
+			case '.ts':
+			case '.tsx':
+				return '#60a5fa';
+			case '.js':
+			case '.jsx':
+				return '#fbbf24';
+			case '.svelte':
+				return '#f97316';
+			case '.css':
+			case '.scss':
+			case '.less':
+				return '#c084fc';
+			case '.json':
+			case '.toml':
+			case '.yaml':
+			case '.yml':
+				return '#a3e635';
+			case '.md':
+				return '#94a3b8';
+			case '.py':
+				return '#4ade80';
+			case '.go':
+				return '#67e8f9';
+			case '.rs':
+				return '#fb923c';
+			case '.sql':
+				return '#f9a8d4';
+			case '.html':
+				return '#f87171';
+			default:
+				return 'var(--text-ghost)';
 		}
 	}
 
@@ -128,7 +154,7 @@
 	);
 
 	let currentProject = $derived(projects.find((p) => p.id === projectId));
-	let fileName = $derived(selectedPath ? selectedPath.split('/').pop() ?? selectedPath : '');
+	let fileName = $derived(selectedPath ? (selectedPath.split('/').pop() ?? selectedPath) : '');
 
 	let hasParsedContent = $derived(
 		!!fileInfo &&
@@ -140,7 +166,13 @@
 	);
 </script>
 
-<div class="docs-page" role="presentation" onclick={() => { showProjectMenu = false; }}>
+<div
+	class="docs-page"
+	role="presentation"
+	onclick={() => {
+		showProjectMenu = false;
+	}}
+>
 	<!-- Top bar -->
 	<header class="topbar">
 		<span class="page-title">Docs</span>
@@ -156,12 +188,17 @@
 							<button
 								class="project-option"
 								class:active={p.id === projectId}
-								onclick={() => { projectId = p.id; showProjectMenu = false; }}
+								onclick={() => {
+									projectId = p.id;
+									showProjectMenu = false;
+								}}
 							>
 								{p.name}
 								<span class="project-path">{p.path}</span>
 							</button>
-							<button class="remove-btn" title="Remove" onclick={() => removeProject(p.id)}>✕</button>
+							<button class="remove-btn" title="Remove" onclick={() => removeProject(p.id)}
+								>✕</button
+							>
 						</div>
 					{/each}
 					{#if addingProject}
@@ -170,11 +207,20 @@
 							<input bind:value={newPath} placeholder="/absolute/path" class="add-input" />
 							<div class="add-actions">
 								<button class="btn-confirm" onclick={addProject}>Add</button>
-								<button class="btn-cancel" onclick={() => { addingProject = false; newName = ''; newPath = ''; }}>Cancel</button>
+								<button
+									class="btn-cancel"
+									onclick={() => {
+										addingProject = false;
+										newName = '';
+										newPath = '';
+									}}>Cancel</button
+								>
 							</div>
 						</div>
 					{:else}
-						<button class="add-project-btn" onclick={() => (addingProject = true)}>+ Add project</button>
+						<button class="add-project-btn" onclick={() => (addingProject = true)}
+							>+ Add project</button
+						>
 					{/if}
 				</div>
 			{/if}
@@ -184,10 +230,18 @@
 				<span class="breadcrumb-path">{selectedPath}</span>
 			</div>
 			<div class="view-toggle">
-				<button class="toggle-btn" class:active={viewMode === 'summary'} onclick={() => (viewMode = 'summary')}>
+				<button
+					class="toggle-btn"
+					class:active={viewMode === 'summary'}
+					onclick={() => (viewMode = 'summary')}
+				>
 					Summary
 				</button>
-				<button class="toggle-btn" class:active={viewMode === 'raw'} onclick={() => (viewMode = 'raw')}>
+				<button
+					class="toggle-btn"
+					class:active={viewMode === 'raw'}
+					onclick={() => (viewMode = 'raw')}
+				>
 					Raw
 				</button>
 			</div>
@@ -249,7 +303,9 @@
 
 					{#if !hasParsedContent}
 						<div class="no-parse-notice">
-							No symbols found — view <button class="inline-link" onclick={() => (viewMode = 'raw')}>raw code</button> instead.
+							No symbols found — view <button class="inline-link" onclick={() => (viewMode = 'raw')}
+								>raw code</button
+							> instead.
 						</div>
 					{:else}
 						{@const groups = groupImports(fileInfo.parsed.imports)}
@@ -324,7 +380,11 @@
 	{#each nodes as node (node.path)}
 		{#if node.type === 'dir'}
 			<div class="tree-dir" style="padding-left: {depth * 12}px">
-				<button class="dir-btn" class:open={expanded.has(node.path)} onclick={() => toggleDir(node.path)}>
+				<button
+					class="dir-btn"
+					class:open={expanded.has(node.path)}
+					onclick={() => toggleDir(node.path)}
+				>
 					<span class="dir-arrow" class:open={expanded.has(node.path)}>▶</span>
 					<span class="dir-name">{node.name}</span>
 				</button>
@@ -369,7 +429,12 @@
 			<span class="line-ref">:{fn.line}</span>
 		</div>
 		{#if fn.doc}
-			<div class="symbol-doc">{fn.doc.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim()}</div>
+			<div class="symbol-doc">
+				{fn.doc
+					.replace(/^\/\*\*|\*\/$/g, '')
+					.replace(/^\s*\* ?/gm, '')
+					.trim()}
+			</div>
 		{/if}
 	</div>
 {/snippet}
@@ -383,7 +448,12 @@
 			<span class="line-ref">:{cls.line}</span>
 		</div>
 		{#if cls.doc}
-			<div class="symbol-doc">{cls.doc.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim()}</div>
+			<div class="symbol-doc">
+				{cls.doc
+					.replace(/^\/\*\*|\*\/$/g, '')
+					.replace(/^\s*\* ?/gm, '')
+					.trim()}
+			</div>
 		{/if}
 		{#if cls.methods.length > 0}
 			<div class="method-list">
@@ -408,7 +478,12 @@
 			<span class="line-ref">:{iface.line}</span>
 		</div>
 		{#if iface.doc}
-			<div class="symbol-doc">{iface.doc.replace(/^\/\*\*|\*\/$/g, '').replace(/^\s*\* ?/gm, '').trim()}</div>
+			<div class="symbol-doc">
+				{iface.doc
+					.replace(/^\/\*\*|\*\/$/g, '')
+					.replace(/^\s*\* ?/gm, '')
+					.trim()}
+			</div>
 		{/if}
 	</div>
 {/snippet}
@@ -537,7 +612,9 @@
 		color: var(--text-ghost);
 		font-size: 0.8125rem;
 		text-align: left;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 		white-space: nowrap;
 		overflow: hidden;
 	}
@@ -576,7 +653,9 @@
 		color: var(--text-dim);
 		font-size: 0.8125rem;
 		text-align: left;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 		white-space: nowrap;
 		overflow: hidden;
 	}
@@ -802,17 +881,45 @@
 		font-weight: 600;
 	}
 
-	.fn-name { color: #fbbf24; }
-	.class-name { color: #f472b6; }
-	.type-name { color: #c084fc; }
-	.method-name { color: #93c5fd; font-family: monospace; font-size: 0.8rem; }
+	.fn-name {
+		color: #fbbf24;
+	}
+	.class-name {
+		color: #f472b6;
+	}
+	.type-name {
+		color: #c084fc;
+	}
+	.method-name {
+		color: #93c5fd;
+		font-family: monospace;
+		font-size: 0.8rem;
+	}
 
-	.kw-export { color: var(--text-ghost); font-size: 0.75rem; }
-	.kw-async  { color: #f472b6; font-size: 0.75rem; }
-	.kw-fn     { color: var(--text-dim); font-size: 0.75rem; }
-	.kw-class  { color: #f472b6; font-size: 0.75rem; }
-	.kw-iface  { color: #c084fc; font-size: 0.75rem; }
-	.kw-type   { color: #c084fc; font-size: 0.75rem; }
+	.kw-export {
+		color: var(--text-ghost);
+		font-size: 0.75rem;
+	}
+	.kw-async {
+		color: #f472b6;
+		font-size: 0.75rem;
+	}
+	.kw-fn {
+		color: var(--text-dim);
+		font-size: 0.75rem;
+	}
+	.kw-class {
+		color: #f472b6;
+		font-size: 0.75rem;
+	}
+	.kw-iface {
+		color: #c084fc;
+		font-size: 0.75rem;
+	}
+	.kw-type {
+		color: #c084fc;
+		font-size: 0.75rem;
+	}
 
 	.line-ref {
 		color: var(--text-ghost);
@@ -927,7 +1034,9 @@
 		border-radius: 5px;
 		color: var(--text-2);
 		font-size: 0.8125rem;
-		transition: border-color 0.15s, background 0.15s;
+		transition:
+			border-color 0.15s,
+			background 0.15s;
 	}
 
 	.project-btn:hover {
@@ -978,7 +1087,9 @@
 		font-size: 0.8125rem;
 		color: var(--text-muted);
 		text-align: left;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.project-option:hover {
@@ -1006,7 +1117,9 @@
 		border-radius: 4px;
 		color: var(--text-ghost);
 		font-size: 0.7rem;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.remove-btn:hover {
@@ -1022,7 +1135,9 @@
 		font-size: 0.8rem;
 		text-align: left;
 		margin-top: 2px;
-		transition: background 0.1s, color 0.1s;
+		transition:
+			background 0.1s,
+			color 0.1s;
 	}
 
 	.add-project-btn:hover {
@@ -1070,7 +1185,9 @@
 		transition: opacity 0.1s;
 	}
 
-	.btn-confirm:hover { opacity: 0.85; }
+	.btn-confirm:hover {
+		opacity: 0.85;
+	}
 
 	.btn-cancel {
 		flex: 1;
@@ -1087,20 +1204,55 @@
 	}
 
 	/* highlight.js theme — dark red palette */
-	:global(.hljs) { color: var(--text); background: transparent; }
-	:global(.hljs-keyword, .hljs-selector-tag, .hljs-deletion) { color: #f472b6; }
-	:global(.hljs-built_in, .hljs-name) { color: #fb923c; }
-	:global(.hljs-string, .hljs-template-string, .hljs-addition) { color: #86efac; }
-	:global(.hljs-comment, .hljs-quote) { color: var(--text-dim); font-style: italic; }
-	:global(.hljs-number, .hljs-literal, .hljs-regexp) { color: #67e8f9; }
-	:global(.hljs-title, .hljs-title.class_, .hljs-title.function_) { color: #fbbf24; }
-	:global(.hljs-type, .hljs-class .hljs-title) { color: #c084fc; }
-	:global(.hljs-attr, .hljs-attribute, .hljs-selector-id, .hljs-selector-class) { color: #93c5fd; }
-	:global(.hljs-variable, .hljs-template-variable) { color: var(--text-2); }
-	:global(.hljs-tag) { color: #f97316; }
-	:global(.hljs-meta) { color: var(--text-muted); }
-	:global(.hljs-operator, .hljs-punctuation) { color: var(--text-2); }
-	:global(.hljs-section) { color: var(--accent); font-weight: bold; }
-	:global(.hljs-symbol) { color: #a3e635; }
-	:global(.hljs-params) { color: var(--text); }
+	:global(.hljs) {
+		color: var(--text);
+		background: transparent;
+	}
+	:global(.hljs-keyword, .hljs-selector-tag, .hljs-deletion) {
+		color: #f472b6;
+	}
+	:global(.hljs-built_in, .hljs-name) {
+		color: #fb923c;
+	}
+	:global(.hljs-string, .hljs-template-string, .hljs-addition) {
+		color: #86efac;
+	}
+	:global(.hljs-comment, .hljs-quote) {
+		color: var(--text-dim);
+		font-style: italic;
+	}
+	:global(.hljs-number, .hljs-literal, .hljs-regexp) {
+		color: #67e8f9;
+	}
+	:global(.hljs-title, .hljs-title.class_, .hljs-title.function_) {
+		color: #fbbf24;
+	}
+	:global(.hljs-type, .hljs-class .hljs-title) {
+		color: #c084fc;
+	}
+	:global(.hljs-attr, .hljs-attribute, .hljs-selector-id, .hljs-selector-class) {
+		color: #93c5fd;
+	}
+	:global(.hljs-variable, .hljs-template-variable) {
+		color: var(--text-2);
+	}
+	:global(.hljs-tag) {
+		color: #f97316;
+	}
+	:global(.hljs-meta) {
+		color: var(--text-muted);
+	}
+	:global(.hljs-operator, .hljs-punctuation) {
+		color: var(--text-2);
+	}
+	:global(.hljs-section) {
+		color: var(--accent);
+		font-weight: bold;
+	}
+	:global(.hljs-symbol) {
+		color: #a3e635;
+	}
+	:global(.hljs-params) {
+		color: var(--text);
+	}
 </style>

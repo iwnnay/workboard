@@ -8,7 +8,9 @@ export const load: PageServerLoad = async () => {
 
 	await db
 		.delete(todo)
-		.where(and(eq(todo.completed, true), isNotNull(todo.completedAt), lt(todo.completedAt, threeDaysAgo)));
+		.where(
+			and(eq(todo.completed, true), isNotNull(todo.completedAt), lt(todo.completedAt, threeDaysAgo))
+		);
 
 	const [todos, notes, reminderRow] = await Promise.all([
 		db.select().from(todo).orderBy(asc(todo.createdAt)),

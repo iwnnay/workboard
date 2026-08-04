@@ -24,7 +24,7 @@ export const GET: RequestHandler = async ({ url }) => {
 	}
 
 	const safeRange = range.replace(/[^a-zA-Z0-9.\-_/~^@{}:]/g, '');
-	const rightRef = safeRange.includes('..') ? (safeRange.split('..').at(-1) || 'HEAD') : 'HEAD';
+	const rightRef = safeRange.includes('..') ? safeRange.split('..').at(-1) || 'HEAD' : 'HEAD';
 
 	let allLines: string[];
 

@@ -104,8 +104,19 @@ export function parseFile(filePath: string): ParsedFile {
 }
 
 const METHOD_SKIP = new Set([
-	'if', 'while', 'for', 'switch', 'return', 'throw',
-	'new', 'class', 'catch', 'try', 'else', 'do', 'case'
+	'if',
+	'while',
+	'for',
+	'switch',
+	'return',
+	'throw',
+	'new',
+	'class',
+	'catch',
+	'try',
+	'else',
+	'do',
+	'case'
 ]);
 
 function parseLines(lines: string[]) {
@@ -127,16 +138,25 @@ function parseLines(lines: string[]) {
 		if (t.startsWith('/**')) {
 			inJsDoc = true;
 			jsDocBuf = [t];
-			if (t.endsWith('*/') && t.length > 4) { inJsDoc = false; pendingDoc = jsDocBuf.join('\n'); }
+			if (t.endsWith('*/') && t.length > 4) {
+				inJsDoc = false;
+				pendingDoc = jsDocBuf.join('\n');
+			}
 			continue;
 		}
 		if (inJsDoc) {
 			jsDocBuf.push(t);
-			if (t.endsWith('*/')) { inJsDoc = false; pendingDoc = jsDocBuf.join('\n'); }
+			if (t.endsWith('*/')) {
+				inJsDoc = false;
+				pendingDoc = jsDocBuf.join('\n');
+			}
 			continue;
 		}
 
-		if (!t) { pendingDoc = undefined; continue; }
+		if (!t) {
+			pendingDoc = undefined;
+			continue;
+		}
 		if (t.startsWith('//')) continue;
 
 		// Import (may span multiple lines)
@@ -164,7 +184,13 @@ function parseLines(lines: string[]) {
 					named.push(
 						...namedBlock[1]
 							.split(',')
-							.map((s) => s.trim().replace(/\s+as\s+\w+$/, '').replace(/^type\s+/, '').trim())
+							.map((s) =>
+								s
+									.trim()
+									.replace(/\s+as\s+\w+$/, '')
+									.replace(/^type\s+/, '')
+									.trim()
+							)
 							.filter(Boolean)
 					);
 				}
@@ -177,7 +203,13 @@ function parseLines(lines: string[]) {
 		// Function declaration
 		const fnDecl = t.match(/^(export\s+(?:default\s+)?)?(async\s+)?function\b\s*\*?\s*(\w+)/);
 		if (fnDecl) {
-			functions.push({ name: fnDecl[3], line: lineNum, isExport: !!fnDecl[1], isAsync: !!fnDecl[2], doc: pendingDoc });
+			functions.push({
+				name: fnDecl[3],
+				line: lineNum,
+				isExport: !!fnDecl[1],
+				isAsync: !!fnDecl[2],
+				doc: pendingDoc
+			});
 			pendingDoc = undefined;
 			continue;
 		}
@@ -199,7 +231,13 @@ function parseLines(lines: string[]) {
 		// Class
 		const classDecl = t.match(/^(export\s+(?:default\s+)?)?(?:abstract\s+)?class\s+(\w+)/);
 		if (classDecl) {
-			const info: ClassInfo = { name: classDecl[2], line: lineNum, isExport: !!classDecl[1], methods: [], doc: pendingDoc };
+			const info: ClassInfo = {
+				name: classDecl[2],
+				line: lineNum,
+				isExport: !!classDecl[1],
+				methods: [],
+				doc: pendingDoc
+			};
 			classes.push(info);
 			pendingDoc = undefined;
 			scanMethods(lines, i, info);
@@ -209,7 +247,12 @@ function parseLines(lines: string[]) {
 		// Interface
 		const ifaceDecl = t.match(/^(export\s+)?interface\s+(\w+)/);
 		if (ifaceDecl) {
-			interfaces.push({ name: ifaceDecl[2], line: lineNum, isExport: !!ifaceDecl[1], doc: pendingDoc });
+			interfaces.push({
+				name: ifaceDecl[2],
+				line: lineNum,
+				isExport: !!ifaceDecl[1],
+				doc: pendingDoc
+			});
 			pendingDoc = undefined;
 			continue;
 		}
@@ -233,12 +276,16 @@ function scanMethods(lines: string[], classIdx: number, info: ClassInfo) {
 	let entered = false;
 	for (let k = classIdx; k < lines.length; k++) {
 		for (const ch of lines[k]) {
-			if (ch === '{') { depth++; entered = true; }
-			else if (ch === '}') depth--;
+			if (ch === '{') {
+				depth++;
+				entered = true;
+			} else if (ch === '}') depth--;
 		}
 		if (entered && depth === 1 && k > classIdx) {
 			const t = lines[k].trim();
-			const m = t.match(/^(?:(?:public|private|protected|static|async|override|abstract|readonly|get|set)\s+)*(\w+)\s*[(<]/);
+			const m = t.match(
+				/^(?:(?:public|private|protected|static|async|override|abstract|readonly|get|set)\s+)*(\w+)\s*[(<]/
+			);
 			if (m && !METHOD_SKIP.has(m[1]) && !t.startsWith('//') && !t.startsWith('*')) {
 				info.methods.push({ name: m[1], line: k + 1, isAsync: /\basync\b/.test(t) });
 			}
