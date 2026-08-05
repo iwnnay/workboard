@@ -6,6 +6,7 @@
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { goto, invalidate } from '$app/navigation';
 	import FileEditor from '$lib/components/FileEditor.svelte';
+	import CommitModal from '$lib/components/CommitModal.svelte';
 
 	let { data }: { data: PageData } = $props();
 
@@ -465,6 +466,16 @@
 			stageAllResetTimer = setTimeout(resetStageAllState, 4000);
 		}
 	}
+
+	// ── Commit (git commit -m) ────────────────────────────────
+
+	let commitModalOpen = $state(false);
+
+	function handleCommitted() {
+		resetStageState();
+		resetStageAllState();
+		void invalidate('diff:data');
+	}
 </script>
 
 <!-- Close dropdown on backdrop click -->
@@ -476,6 +487,14 @@
 		onclick={() => (dropdownOpen = false)}
 		onkeydown={(e) => e.key === 'Escape' && (dropdownOpen = false)}
 	></div>
+{/if}
+
+{#if commitModalOpen}
+	<CommitModal
+		projectId={data.projectId}
+		onClose={() => (commitModalOpen = false)}
+		onCommitted={handleCommitted}
+	/>
 {/if}
 
 <!-- Copy ref floating tooltip -->
@@ -585,6 +604,12 @@
 					: stageAllState === 'pending'
 						? '…'
 						: 'Stage all'}</button
+		>
+
+		<button
+			class="stage-btn topbar-stage-btn"
+			onclick={() => (commitModalOpen = true)}
+			title="git commit -m …">Commit</button
 		>
 
 		{#if data.error}
