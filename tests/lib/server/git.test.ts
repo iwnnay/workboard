@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDiff } from './git';
+import { parseDiff } from '$lib/server/git';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 

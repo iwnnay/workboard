@@ -11,10 +11,8 @@
 		onDeleted,
 		onClose
 	}: {
-		/** Null when adding; an existing record when editing. */
 		server?: ManagedServer | null;
 		onSaved: () => void;
-		/** Called after the record has been stopped and removed. */
 		onDeleted: () => void;
 		onClose: () => void;
 	} = $props();
@@ -24,8 +22,6 @@
 		{ value: 'node', label: 'Svelte / NPM (npm run dev)' }
 	];
 
-	// The modal is mounted fresh per open, so the fields are seeded once from the
-	// record being edited and are the user's to change from then on.
 	const initial = untrack(() => server);
 
 	let alias = $state(initial?.alias ?? '');
@@ -34,11 +30,9 @@
 	let portText = $state(
 		initial?.port === null || initial?.port === undefined ? '' : String(initial.port)
 	);
-	let passPortToCommand = $state(initial?.passPortToCommand ?? true);
 	let docker = $state(initial?.docker ?? false);
 	let dockerCommand = $state(initial?.dockerCommand ?? '');
 
-	/** Where a detected port came from, shown under the port field. */
 	let portSource = $state<string | null>(null);
 
 	let showPicker = $state(false);
@@ -47,12 +41,6 @@
 	let removing = $state(false);
 	let errorMessage = $state('');
 	let detectionNote = $state('');
-
-	/**
-	 * A backdrop click only counts when the press *and* the release both landed
-	 * on the backdrop, so dragging a selection out of the form doesn't discard
-	 * what was typed. Not reactive — nothing renders it.
-	 */
 	let pressStartedOnBackdrop = false;
 
 	function onBackdropMouseDown(event: MouseEvent) {
@@ -68,7 +56,6 @@
 
 	const isEditing = $derived(server !== null);
 
-	/** The port as typed, or null when the field is empty or not a real port. */
 	const draftPort = $derived.by(() => {
 		const trimmed = portText.trim();
 		if (trimmed === '') return null;
@@ -76,16 +63,10 @@
 		return isValidPort(port) ? port : null;
 	});
 
-	/** Exactly what the launcher will run, built by the launcher's own code. */
 	const startCommandPreview = $derived(
-		describeStartCommand(serverType, draftPort, passPortToCommand)
+		draftPort === null ? '' : describeStartCommand(serverType, draftPort)
 	);
 
-	/**
-	 * Fill in what we can infer from the folder. On a new server everything is
-	 * overwritten; on an edit we only fill blanks, since the whole point of the
-	 * form is that the user's overrides survive.
-	 */
 	async function applyDetection(pickedDirectory: string) {
 		detecting = true;
 		errorMessage = '';
@@ -107,12 +88,9 @@
 				if (!dockerCommand) dockerCommand = detection.dockerCommand;
 			}
 
-			// A port the project sets for itself is authoritative: fill it in, and
-			// don't force it back onto the start command.
 			portSource = detection.portSource;
 			if (detection.port !== null && (!portText.trim() || !isEditing)) {
 				portText = String(detection.port);
-				passPortToCommand = false;
 			}
 
 			detectionNote = detection.markers.length
@@ -125,13 +103,12 @@
 		}
 	}
 
-	function buildDraft(): ManagedServerDraft {
+	function buildDraft(port: number): ManagedServerDraft {
 		return {
 			alias: alias.trim(),
 			directory: directory.trim(),
 			serverType,
-			port: draftPort,
-			passPortToCommand,
+			port,
 			docker,
 			dockerCommand: dockerCommand.trim()
 		};
@@ -142,14 +119,17 @@
 			errorMessage = 'Pick a project directory before saving.';
 			return;
 		}
-		if (portText.trim() !== '' && draftPort === null) {
-			errorMessage = `"${portText.trim()}" is not a valid port — use a whole number between 1 and 65535, or clear the field.`;
+		if (draftPort === null) {
+			errorMessage =
+				portText.trim() === ''
+					? 'Set the port this server listens on.'
+					: `"${portText.trim()}" is not a valid port — use a whole number between 1 and 65535.`;
 			return;
 		}
 		saving = true;
 		errorMessage = '';
 		try {
-			const draft = buildDraft();
+			const draft = buildDraft(draftPort);
 			if (server) await serversApi.update(server.id, draft);
 			else await serversApi.create(draft);
 			onSaved();
@@ -160,10 +140,6 @@
 		}
 	}
 
-	/**
-	 * Removing stops the server (and its Docker resources) first — the API keeps
-	 * the record if anything is still up, and that failure is shown right here.
-	 */
 	async function remove() {
 		if (!server) return;
 
@@ -246,9 +222,7 @@
 			</div>
 
 			<div class="field">
-				<label class="field-label" for="server-port">
-					Port <span class="optional">optional</span>
-				</label>
+				<label class="field-label" for="server-port">Port</label>
 				<input
 					id="server-port"
 					class="input mono"
@@ -256,26 +230,11 @@
 					inputmode="numeric"
 					placeholder="7010"
 					spellcheck="false"
+					required
 				/>
 				{#if portSource}
 					<span class="hint found">Found in {portSource}.</span>
 				{/if}
-
-				<label class="port-flag" class:off={!passPortToCommand}>
-					<input type="checkbox" bind:checked={passPortToCommand} disabled={draftPort === null} />
-					<span class="port-flag-label">Use this port when starting the server</span>
-				</label>
-				<span class="hint">
-					{#if draftPort === null}
-						No port set — nothing to apply. The launcher's open link stays disabled.
-					{:else if passPortToCommand}
-						{serverType === 'node'
-							? 'Appended to the start command as --port.'
-							: 'Passed to the start command as a PORT environment variable.'}
-					{:else}
-						Recorded for the status probe and the open link only — the project applies it itself.
-					{/if}
-				</span>
 			</div>
 
 			<div class="field">
@@ -314,7 +273,11 @@
 				</button>
 			{/if}
 			<button class="cancel-btn" onclick={onClose}>Cancel</button>
-			<button class="save-btn" onclick={save} disabled={saving || removing || !directory.trim()}>
+			<button
+				class="save-btn"
+				onclick={save}
+				disabled={saving || removing || !directory.trim() || draftPort === null}
+			>
 				{saving ? 'Saving…' : isEditing ? 'Save changes' : 'Add server'}
 			</button>
 		</footer>
@@ -419,12 +382,6 @@
 		color: var(--text-2);
 	}
 
-	.optional {
-		text-transform: none;
-		letter-spacing: 0;
-		color: var(--text-faint);
-	}
-
 	.input {
 		width: 100%;
 		background: var(--bg);
@@ -471,29 +428,6 @@
 
 	.hint.found {
 		color: #86efac;
-	}
-
-	/* The port flag sits inside the port field, so it reads as part of it. */
-	.port-flag {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		margin-top: 0.2rem;
-		padding: 0.35rem 0.5rem;
-		border: 1px solid var(--accent-muted);
-		border-radius: 5px;
-		background: var(--accent-bg);
-		cursor: pointer;
-	}
-
-	.port-flag.off {
-		border-color: var(--border);
-		background: var(--surface-2);
-	}
-
-	.port-flag-label {
-		font-size: 0.8125rem;
-		color: var(--text-2);
 	}
 
 	.command-preview {

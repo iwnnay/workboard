@@ -5,33 +5,17 @@ import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 const execAsync = promisify(exec);
-
-/** Where per-server stdout/stderr is appended. Already git-ignored. */
 const LOG_DIR = resolve(process.cwd(), 'logs', 'servers');
-
-/** How long a Docker command may run before we give up on it. */
 const DOCKER_TIMEOUT_MS = 120_000;
-
-/** Grace period after spawning before we check the process is still up. */
 const STARTUP_GRACE_MS = 700;
-
-/** How long we wait for a killed process tree to actually disappear. */
 const STOP_TIMEOUT_MS = 10_000;
 const STOP_POLL_MS = 250;
+const PORT_OWNER_TIMEOUT_MS = 5_000;
 
 export function logPathFor(serverId: string): string {
 	return join(LOG_DIR, `${serverId}.log`);
 }
 
-/**
- * Whether `pid` names a live process. Signal 0 performs the permission and
- * existence checks without delivering anything; `EPERM` means the process is
- * there but owned by someone else, which still counts as running.
- *
- * Caveat: after the workboard itself restarts we only have the stored pid, so
- * a recycled pid can read as running. The port probe in `status.ts` is the
- * tie-breaker the UI shows alongside it.
- */
 export function isProcessAlive(pid: number | null | undefined): boolean {
 	if (!pid || pid <= 0) return false;
 	try {
@@ -46,7 +30,6 @@ function wait(milliseconds: number): Promise<void> {
 	return new Promise((resolveWait) => setTimeout(resolveWait, milliseconds));
 }
 
-/** Last `lineCount` lines of a server log, for error messages. */
 export async function readLogTail(logPath: string, lineCount = 20): Promise<string> {
 	try {
 		const content = await readFile(logPath, 'utf8');
@@ -58,11 +41,6 @@ export async function readLogTail(logPath: string, lineCount = 20): Promise<stri
 	}
 }
 
-/**
- * Run a one-shot shell command (Docker, mostly) and return its output. Throws
- * with the command, directory and captured stderr so a failure is diagnosable
- * from the log alone.
- */
 export async function runShellCommand(
 	command: string,
 	cwd: string,
@@ -81,13 +59,6 @@ export async function runShellCommand(
 	}
 }
 
-/**
- * Launch `command` in `cwd` as a background process, appending its output to
- * `logPath`. `extraEnvironment` is overlaid on this process's environment —
- * that is how a Python server receives its `PORT`. Returns the pid of the
- * launched shell, which is what we later kill (as a tree, so the shell's
- * children go with it).
- */
 export async function spawnBackgroundCommand(
 	command: string,
 	cwd: string,
@@ -102,13 +73,11 @@ export async function spawnBackgroundCommand(
 			cwd,
 			shell: true,
 			windowsHide: true,
-			detached: process.platform !== 'win32',
+			detached: true,
 			stdio: ['ignore', logFd, logFd],
 			env: { ...process.env, ...extraEnvironment }
 		});
 
-		// Errors arrive asynchronously; without a listener they would crash the
-		// workboard process itself once we unref the child.
 		child.on('error', () => {});
 
 		if (!child.pid) {
@@ -134,10 +103,58 @@ export async function spawnBackgroundCommand(
 }
 
 /**
- * Kill a process and everything it spawned. `npm run dev` and `uv run` both
- * sit behind a shell wrapper, so killing the recorded pid alone would orphan
- * the actual server.
+ * A row looks like:
+ * `  TCP    0.0.0.0:7010    0.0.0.0:0    LISTENING    12345`
  */
+export function parseNetstatListeningPids(stdout: string, port: number): number[] {
+	const pids: number[] = [];
+
+	for (const line of stdout.split(/\r?\n/)) {
+		const columns = line.trim().split(/\s+/);
+		if (columns.length < 5) continue;
+
+		const [protocol, localAddress, , state, pidColumn] = columns;
+		if (protocol.toLowerCase() !== 'tcp') continue;
+		if (state.toLowerCase() !== 'listening') continue;
+		if (!localAddress.endsWith(`:${port}`)) continue;
+
+		const pid = Number(pidColumn);
+		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) pids.push(pid);
+	}
+
+	return pids;
+}
+
+export function parseLsofPids(stdout: string): number[] {
+	const pids: number[] = [];
+
+	for (const line of stdout.split(/\r?\n/)) {
+		const pid = Number(line.trim());
+		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) pids.push(pid);
+	}
+
+	return pids;
+}
+
+export async function findPortOwnerPid(port: number): Promise<number | null> {
+	try {
+		if (process.platform === 'win32') {
+			const { stdout } = await execAsync('netstat -ano -p tcp', {
+				timeout: PORT_OWNER_TIMEOUT_MS,
+				windowsHide: true
+			});
+			return parseNetstatListeningPids(stdout, port)[0] ?? null;
+		}
+
+		const { stdout } = await execAsync(`lsof -nP -iTCP:${port} -sTCP:LISTEN -t`, {
+			timeout: PORT_OWNER_TIMEOUT_MS
+		});
+		return parseLsofPids(stdout)[0] ?? null;
+	} catch {
+		return null;
+	}
+}
+
 export async function stopProcessTree(pid: number): Promise<void> {
 	if (!isProcessAlive(pid)) return;
 
@@ -145,8 +162,6 @@ export async function stopProcessTree(pid: number): Promise<void> {
 		try {
 			await execAsync(`taskkill /PID ${pid} /T /F`, { windowsHide: true });
 		} catch (caught) {
-			// taskkill exits non-zero when the process is already gone; only a
-			// still-live process makes that an actual failure.
 			if (isProcessAlive(pid)) {
 				throw new Error(
 					`stopping process tree for pid ${pid} with taskkill: ${
@@ -175,7 +190,6 @@ export async function stopProcessTree(pid: number): Promise<void> {
 
 function killPosixTree(pid: number, signal: NodeJS.Signals): void {
 	try {
-		// Negative pid targets the process group created by `detached: true`.
 		process.kill(-pid, signal);
 	} catch {
 		try {

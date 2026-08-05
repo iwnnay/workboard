@@ -72,7 +72,7 @@
 	function isRunning(server: ManagedServer): boolean {
 		const status = statusFor(server.id);
 		if (!status) return false;
-		return status.process.state === 'running' || status.port.listening === true;
+		return status.process.state === 'running' || status.port.listening;
 	}
 
 	function openAdd() {
@@ -114,8 +114,8 @@
 		if (pageVisible) onFocusPoll();
 	}
 
-	function linkFor(server: ManagedServer): string | null {
-		return server.port === null ? null : `http://localhost:${server.port}`;
+	function linkFor(server: ManagedServer): string {
+		return `http://localhost:${server.port}`;
 	}
 
 	function formatChecked(timestamp: number | null): string {
@@ -178,7 +178,7 @@
 							<span class="dot" class:on={running}></span>
 							<span class="alias">{server.alias}</span>
 							<span class="type-tag">{SERVER_TYPE_LABELS[server.serverType]}</span>
-							{#if server.port !== null}<span class="port-tag mono">:{server.port}</span>{/if}
+							<span class="port-tag mono">:{server.port}</span>
 						</div>
 						<div class="directory mono">{server.directory}</div>
 					</div>
@@ -192,12 +192,10 @@
 									? ` · pid ${status.process.pid}`
 									: ''}
 							</span>
-							{#if status.port.configured !== null}
-								<span class="pill" class:on={status.port.listening === true}>
-									port {status.port.configured}
-									{status.port.listening ? 'listening' : 'closed'}
-								</span>
-							{/if}
+							<span class="pill" class:on={status.port.listening}>
+								port {status.port.configured}
+								{status.port.listening ? 'listening' : 'closed'}
+							</span>
 							{#if status.docker.enabled}
 								<span
 									class="pill"
@@ -238,21 +236,15 @@
 						>
 							Restart
 						</button>
-						{#if linkFor(server)}
-							<a
-								class="action link"
-								href={linkFor(server)}
-								target="_blank"
-								rel="external noreferrer"
-								title="Open {linkFor(server)} in a new tab"
-							>
-								Open ↗
-							</a>
-						{:else}
-							<span class="action link disabled" title="Set a port in Edit to enable this link">
-								Open ↗
-							</span>
-						{/if}
+						<a
+							class="action link"
+							href={linkFor(server)}
+							target="_blank"
+							rel="external noreferrer"
+							title="Open {linkFor(server)} in a new tab"
+						>
+							Open ↗
+						</a>
 						<button class="action" disabled={busy} onclick={() => openEdit(server)}>Edit</button>
 					</div>
 
@@ -519,12 +511,6 @@
 		background: var(--accent-bg);
 		color: var(--accent);
 		font-weight: 600;
-	}
-
-	/* No port configured — there is nowhere to open, so the link is inert. */
-	.action.link.disabled {
-		opacity: 0.35;
-		cursor: default;
 	}
 
 	.row-error {

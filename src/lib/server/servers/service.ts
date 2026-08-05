@@ -19,13 +19,14 @@ import {
 } from '$lib/start-command';
 import { aliasFromDirectory, detectServer } from './detect';
 import {
+	findPortOwnerPid,
 	isProcessAlive,
 	logPathFor,
 	runShellCommand,
 	spawnBackgroundCommand,
 	stopProcessTree
 } from './process';
-import { probeServerStatus } from './status';
+import { isPortListening, probeServerStatus } from './status';
 
 type ManagedServerRow = typeof managedServer.$inferSelect;
 
@@ -85,9 +86,6 @@ export async function normaliseDraft(input: unknown): Promise<ManagedServerDraft
 		directory,
 		serverType,
 		port: parsePort(draft.port),
-		// Absent means "yes" — only an explicit false suppresses the flag, so an
-		// older client can't silently stop passing a port it meant to pass.
-		passPortToCommand: draft.passPortToCommand !== false,
 		docker,
 		dockerCommand: docker ? dockerCommandInput || DEFAULT_DOCKER_COMMAND : dockerCommandInput
 	};
@@ -123,11 +121,6 @@ export async function updateServer(id: string, draft: ManagedServerDraft): Promi
 	return toManagedServer(updated);
 }
 
-/**
- * Stop the server (and its Docker resources), confirm nothing is left running,
- * then drop the record. Refuses to delete while the process is still alive so
- * we never lose track of a running server.
- */
 export async function deleteServer(id: string): Promise<ServerStatus> {
 	const stopped = await stopServer(id);
 
@@ -148,12 +141,48 @@ export async function deleteServer(id: string): Promise<ServerStatus> {
 	return stopped;
 }
 
-/** Forget a pid we know is gone, so the UI stops reporting a dead process. */
 async function clearProcessRecord(id: string): Promise<void> {
 	await db
 		.update(managedServer)
 		.set({ pid: null, startedAt: null })
 		.where(eq(managedServer.id, id));
+}
+
+async function adoptProcessRecord(id: string, pid: number, startedAt: string): Promise<void> {
+	await db.update(managedServer).set({ pid, startedAt }).where(eq(managedServer.id, id));
+}
+
+async function reconcileProcessRecord(
+	server: ManagedServer,
+	status: ServerStatus
+): Promise<{ server: ManagedServer; status: ServerStatus }> {
+	if (status.process.state === 'running') return { server, status };
+	if (server.pid === null) return { server, status };
+
+	if (status.port.listening) {
+		if (server.docker) return { server, status };
+
+		const ownerPid = await findPortOwnerPid(server.port);
+		if (ownerPid === null) {
+			return { server, status };
+		}
+
+		const startedAt = server.startedAt ?? new Date().toISOString();
+		await adoptProcessRecord(server.id, ownerPid, startedAt);
+		return {
+			server: { ...server, pid: ownerPid, startedAt },
+			status: { ...status, process: { state: 'running', pid: ownerPid, startedAt } }
+		};
+	}
+
+	await clearProcessRecord(server.id);
+	return { server: { ...server, pid: null, startedAt: null }, status };
+}
+
+export async function checkServer(id: string): Promise<ServerStatus> {
+	const server = await getServer(id);
+	const probed = await probeServerStatus(server);
+	return (await reconcileProcessRecord(server, probed)).status;
 }
 
 export async function startServer(id: string): Promise<ServerStatus> {
@@ -166,18 +195,23 @@ export async function startServer(id: string): Promise<ServerStatus> {
 		);
 	}
 
+	if (await isPortListening(server.port)) {
+		const ownerPid = await findPortOwnerPid(server.port);
+		throw new Error(
+			`starting managed server "${server.alias}" (${id}): port ${server.port} is already ` +
+				`listening${ownerPid === null ? '' : ` (pid ${ownerPid})`}, so no second instance was ` +
+				`started; stop or restart it instead`
+		);
+	}
+
 	if (server.docker) {
 		const dockerCommand = server.dockerCommand || DEFAULT_DOCKER_COMMAND;
 		await runShellCommand(dockerCommand, server.directory);
 	}
 
 	const logPath = logPathFor(id);
-	const command = buildStartCommand(server.serverType, server.port, server.passPortToCommand);
-	const environment = buildStartEnvironment(
-		server.serverType,
-		server.port,
-		server.passPortToCommand
-	);
+	const command = buildStartCommand(server.serverType);
+	const environment = buildStartEnvironment(server.port);
 	const pid = await spawnBackgroundCommand(command, server.directory, logPath, environment);
 	const startedAt = new Date().toISOString();
 
@@ -192,11 +226,17 @@ export async function stopServer(id: string): Promise<ServerStatus> {
 	if (server.pid !== null) {
 		await stopProcessTree(server.pid);
 	}
-	await clearProcessRecord(id);
 
 	if (server.docker) {
 		await runShellCommand(deriveDockerStopCommand(server.dockerCommand || ''), server.directory);
 	}
+
+	if (server.pid !== null && (await isPortListening(server.port))) {
+		const ownerPid = await findPortOwnerPid(server.port);
+		if (ownerPid !== null && ownerPid !== server.pid) await stopProcessTree(ownerPid);
+	}
+
+	await clearProcessRecord(id);
 
 	return probeServerStatus({ ...server, pid: null, startedAt: null });
 }
@@ -206,22 +246,14 @@ export async function restartServer(id: string): Promise<ServerStatus> {
 	return startServer(id);
 }
 
-/**
- * Every server with a freshly probed status. Stale pids (a server that died on
- * its own, or a workboard restart that outlived its children) are cleared here
- * so the next poll starts from the truth.
- */
 export async function listServersWithStatus(): Promise<ManagedServerWithStatus[]> {
 	const servers = await listServers();
 
 	return Promise.all(
 		servers.map(async (server) => {
-			const status = await probeServerStatus(server);
-			if (server.pid !== null && status.process.state === 'stopped') {
-				await clearProcessRecord(server.id);
-				return { ...server, pid: null, startedAt: null, status };
-			}
-			return { ...server, status };
+			const probed = await probeServerStatus(server);
+			const reconciled = await reconcileProcessRecord(server, probed);
+			return { ...reconciled.server, status: reconciled.status };
 		})
 	);
 }

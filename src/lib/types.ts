@@ -44,9 +44,8 @@ export type ManagedServer = {
 	alias: string;
 	directory: string;
 	serverType: ServerType;
-	port: number | null;
-	/** False when the project sets its own port, so the launcher must not force one. */
-	passPortToCommand: boolean;
+	/** Where the server listens: how it is started, probed and linked to. */
+	port: number;
 	docker: boolean;
 	dockerCommand: string;
 	pid: number | null;
@@ -60,8 +59,7 @@ export type ManagedServerDraft = {
 	alias: string;
 	directory: string;
 	serverType: ServerType;
-	port: number | null;
-	passPortToCommand: boolean;
+	port: number;
 	docker: boolean;
 	dockerCommand: string;
 };
@@ -95,10 +93,9 @@ export type ServerStatus = {
 		pid: number | null;
 		startedAt: string | null;
 	};
-	/** Null when the server has no port configured, so nothing was probed. */
 	port: {
-		configured: number | null;
-		listening: boolean | null;
+		configured: number;
+		listening: boolean;
 	};
 	docker: {
 		enabled: boolean;

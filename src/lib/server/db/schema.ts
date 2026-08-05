@@ -67,9 +67,7 @@ export const managedServer = sqliteTable('managed_server', {
 	alias: text('alias').notNull(),
 	directory: text('directory').notNull(),
 	serverType: text('server_type').notNull(),
-	port: integer('port'),
-	/** False when the project configures its own port, so we must not force one. */
-	passPortToCommand: integer('pass_port_to_command', { mode: 'boolean' }).notNull().default(true),
+	port: integer('port').notNull(),
 	docker: integer('docker', { mode: 'boolean' }).notNull().default(false),
 	dockerCommand: text('docker_command').notNull().default(''),
 	pid: integer('pid'),

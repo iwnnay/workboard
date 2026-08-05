@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseComposePs, summariseDockerState } from './status';
+import { parseComposePs, summariseDockerState } from '$lib/server/servers/status';
 
 describe('parseComposePs', () => {
 	it('parses the JSON array emitted by recent Compose versions', () => {

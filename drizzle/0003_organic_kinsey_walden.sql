@@ -1,0 +1,1 @@
+ALTER TABLE `managed_server` DROP COLUMN `pass_port_to_command`;

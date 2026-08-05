@@ -103,7 +103,7 @@ async function probeDocker(server: ManagedServer): Promise<ServerStatus['docker'
 /** Probe every signal we have for one server. Independent checks run together. */
 export async function probeServerStatus(server: ManagedServer): Promise<ServerStatus> {
 	const [listening, docker] = await Promise.all([
-		server.port === null ? Promise.resolve(null) : isPortListening(server.port),
+		isPortListening(server.port),
 		probeDocker(server)
 	]);
 

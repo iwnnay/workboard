@@ -9,7 +9,7 @@ import {
 	parseDevScriptPort,
 	parseEnvPort,
 	parseViteServerPort
-} from './detect';
+} from '$lib/server/servers/detect';
 
 let root: string;
 

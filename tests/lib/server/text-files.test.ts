@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs';
 import { tmpdir } from 'os';
 import { join } from 'path';
-import { detectEol, normalizeToLf, restoreEol, hashContent, saveTextFile } from './text-files';
+import {
+	detectEol,
+	normalizeToLf,
+	restoreEol,
+	hashContent,
+	saveTextFile
+} from '$lib/server/text-files';
 
 describe('detectEol', () => {
 	it('detects pure CRLF', () => {

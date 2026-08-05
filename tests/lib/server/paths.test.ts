@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { join, resolve, sep } from 'path';
-import { resolveSafePath } from './paths';
+import { resolveSafePath } from '$lib/server/paths';
 
 const root = resolve(process.cwd(), 'fake-root');
 
