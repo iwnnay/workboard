@@ -7,6 +7,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import FileEditor from '$lib/components/FileEditor.svelte';
 	import CommitModal from '$lib/components/CommitModal.svelte';
+	import { diffApi } from '$lib/diff-api';
 
 	let { data }: { data: PageData } = $props();
 
@@ -102,15 +103,21 @@
 		const storageKey = reviewedStorageKey(data.projectId);
 		const storedFingerprints = readStoredFingerprints(storageKey);
 		for (const file of data.files) {
-			if (reviewed.has(file.path)) storedFingerprints[file.path] = fileFingerprint(file);
-			else delete storedFingerprints[file.path];
+			if (reviewed.has(file.path)) {
+				storedFingerprints[file.path] = fileFingerprint(file);
+			} else {
+				delete storedFingerprints[file.path];
+			}
 		}
 		localStorage.setItem(storageKey, JSON.stringify(storedFingerprints));
 	}
 
 	function toggleReviewed(path: string) {
-		if (reviewed.has(path)) reviewed.delete(path);
-		else reviewed.add(path);
+		if (reviewed.has(path)) {
+			reviewed.delete(path);
+		} else {
+			reviewed.add(path);
+		}
 		persistReviewed();
 	}
 
@@ -123,7 +130,9 @@
 			reviewed.clear();
 			const storedFingerprints = readStoredFingerprints(storageKey);
 			for (const file of currentFiles) {
-				if (storedFingerprints[file.path] === fileFingerprint(file)) reviewed.add(file.path);
+				if (storedFingerprints[file.path] === fileFingerprint(file)) {
+					reviewed.add(file.path);
+				}
 			}
 		});
 	});
@@ -145,16 +154,22 @@
 			editing = true;
 			return;
 		}
-		if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) return;
+		if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) {
+			return;
+		}
 		closeEditor();
 	}
 
 	function selectFile(path: string) {
 		if (editing) {
-			if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) return;
+			if (editorDirty && !confirm(`Discard unsaved changes to ${activeFile?.path}?`)) {
+				return;
+			}
 			closeEditor();
 		}
-		if (path !== selectedPath) resetStageState();
+		if (path !== selectedPath) {
+			resetStageState();
+		}
 		_selectedPath = path;
 	}
 
@@ -163,7 +178,9 @@
 	function navigate(projectId: string, range: string) {
 		localStorage.setItem('diff_projectId', projectId);
 		const params = new URLSearchParams({ range });
-		if (projectId) params.set('projectId', projectId);
+		if (projectId) {
+			params.set('projectId', projectId);
+		}
 		loading = true;
 		window.location.href = `/diff?${params.toString()}`;
 	}
@@ -178,7 +195,9 @@
 
 	async function addProject() {
 		const path = newProjectPath.trim();
-		if (!path) return;
+		if (!path) {
+			return;
+		}
 		const name = deriveName(path);
 		const res = await fetch('/api/projects', {
 			method: 'POST',
@@ -224,7 +243,9 @@
 
 	function statBoxes(additions: number, deletions: number) {
 		const total = additions + deletions;
-		if (total === 0) return Array(5).fill('empty');
+		if (total === 0) {
+			return Array(5).fill('empty');
+		}
 		const green = Math.round((additions / total) * 5);
 		return Array.from({ length: 5 }, (_, i) => (i < green ? 'add' : 'del'));
 	}
@@ -238,7 +259,9 @@
 	type ContentPart = { text: string; hl: boolean };
 
 	function splitContent(content: string, word: string): ContentPart[] {
-		if (!word || word.length < 2) return [{ text: content, hl: false }];
+		if (!word || word.length < 2) {
+			return [{ text: content, hl: false }];
+		}
 		try {
 			const re = new RegExp(`(${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'g');
 			return content.split(re).map((text, i) => ({ text, hl: i % 2 === 1 }));
@@ -262,8 +285,12 @@
 			} else {
 				const removes: DiffLine[] = [];
 				const adds: DiffLine[] = [];
-				while (i < lines.length && lines[i].type === 'remove') removes.push(lines[i++]);
-				while (i < lines.length && lines[i].type === 'add') adds.push(lines[i++]);
+				while (i < lines.length && lines[i].type === 'remove') {
+					removes.push(lines[i++]);
+				}
+				while (i < lines.length && lines[i].type === 'add') {
+					adds.push(lines[i++]);
+				}
 				const len = Math.max(removes.length, adds.length);
 				for (let j = 0; j < len; j++) {
 					rows.push({ left: removes[j] ?? null, right: adds[j] ?? null });
@@ -278,12 +305,16 @@
 	type Gap = { newStart: number; newEnd: number; count: number };
 
 	function getGapBefore(file: DiffFile, hunkIdx: number): Gap | null {
-		if (hunkIdx === 0) return null;
+		if (hunkIdx === 0) {
+			return null;
+		}
 		const prev = file.hunks[hunkIdx - 1];
 		const curr = file.hunks[hunkIdx];
 		const lastNew = [...prev.lines].reverse().find((l) => l.newNum !== null)?.newNum;
 		const firstNew = curr.lines.find((l) => l.newNum !== null)?.newNum;
-		if (lastNew == null || firstNew == null || firstNew <= lastNew + 1) return null;
+		if (lastNew == null || firstNew == null || firstNew <= lastNew + 1) {
+			return null;
+		}
 		return { newStart: lastNew + 1, newEnd: firstNew - 1, count: firstNew - lastNew - 1 };
 	}
 
@@ -293,20 +324,20 @@
 
 	async function expandGap(file: DiffFile, hunkIdx: number, gap: Gap) {
 		const key = gapKey(file.path, hunkIdx);
-		if (expandedGaps.has(key)) return;
-		const params = new URLSearchParams({
-			projectId: selectedProjectId,
-			path: file.path,
-			range: data.range,
-			start: String(gap.newStart),
-			end: String(gap.newEnd)
-		});
+		if (expandedGaps.has(key)) {
+			return;
+		}
 		try {
-			const res = await fetch(`/api/diff/lines?${params}`);
-			const { lines } = await res.json();
-			expandedGaps.set(key, lines as string[]);
+			const { lines } = await diffApi.lines(
+				selectedProjectId,
+				file.path,
+				data.range,
+				gap.newStart,
+				gap.newEnd
+			);
+			expandedGaps.set(key, lines);
 		} catch {
-			// ignore
+			// The gap simply stays collapsed.
 		}
 	}
 
@@ -325,7 +356,9 @@
 	}
 
 	function handleDiffMouseUp(e: MouseEvent) {
-		if (editing) return;
+		if (editing) {
+			return;
+		}
 		const sel = window.getSelection();
 		const text = sel?.toString().trim() ?? '';
 
@@ -367,12 +400,16 @@
 	}
 
 	async function doCopyRef() {
-		if (!copyRef) return;
+		if (!copyRef) {
+			return;
+		}
 		await navigator.clipboard.writeText(copyRef.ref);
 		const saved = copyRef;
 		copyRef = { ...saved, ref: '✓ copied' };
 		setTimeout(() => {
-			if (copyRef?.ref === '✓ copied') copyRef = null;
+			if (copyRef?.ref === '✓ copied') {
+				copyRef = null;
+			}
 		}, 1200);
 	}
 
@@ -382,7 +419,9 @@
 	let pathCopiedTimer: ReturnType<typeof setTimeout> | undefined;
 
 	async function copyFilePath() {
-		if (!activeFile) return;
+		if (!activeFile) {
+			return;
+		}
 		await navigator.clipboard.writeText(activeFile.path);
 		pathCopied = true;
 		clearTimeout(pathCopiedTimer);
@@ -402,24 +441,15 @@
 	}
 
 	async function stageFile() {
-		if (!activeFile || stageState === 'pending') return;
+		if (!activeFile || stageState === 'pending') {
+			return;
+		}
 		const stagedPath = activeFile.path;
 		clearTimeout(stageResetTimer);
 		stageState = 'pending';
 		stageError = '';
 		try {
-			const response = await fetch('/api/diff/stage', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ projectId: data.projectId, path: stagedPath })
-			});
-			const payload = await response.json();
-			if (!response.ok) {
-				throw new Error(
-					payload.error ??
-						`staging file "${stagedPath}": request failed with status ${response.status}`
-				);
-			}
+			await diffApi.stage(data.projectId, stagedPath);
 			stageState = 'staged';
 			stageResetTimer = setTimeout(resetStageState, 1500);
 		} catch (caught) {
@@ -442,22 +472,14 @@
 	}
 
 	async function stageAllFiles() {
-		if (stageAllState === 'pending') return;
+		if (stageAllState === 'pending') {
+			return;
+		}
 		clearTimeout(stageAllResetTimer);
 		stageAllState = 'pending';
 		stageAllError = '';
 		try {
-			const response = await fetch('/api/diff/stage', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ projectId: data.projectId, all: true })
-			});
-			const payload = await response.json();
-			if (!response.ok) {
-				throw new Error(
-					payload.error ?? `staging all changes: request failed with status ${response.status}`
-				);
-			}
+			await diffApi.stageAll(data.projectId);
 			stageAllState = 'staged';
 			stageAllResetTimer = setTimeout(resetStageAllState, 1500);
 		} catch (caught) {
@@ -558,8 +580,12 @@
 							placeholder="/path/to/repo"
 							spellcheck="false"
 							onkeydown={(e) => {
-								if (e.key === 'Enter') addProject();
-								if (e.key === 'Escape') dropdownOpen = false;
+								if (e.key === 'Enter') {
+									addProject();
+								}
+								if (e.key === 'Escape') {
+									dropdownOpen = false;
+								}
 							}}
 						/>
 						<button class="proj-add-btn" onclick={addProject}>Add</button>

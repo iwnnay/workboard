@@ -7,13 +7,19 @@ import Database from 'better-sqlite3';
 import { existsSync, readFileSync } from 'fs';
 
 function loadDotEnv() {
-	if (!existsSync('.env')) return;
+	if (!existsSync('.env')) {
+		return;
+	}
 	for (const line of readFileSync('.env', 'utf8').split('\n')) {
 		const eq = line.indexOf('=');
-		if (eq === -1) continue;
+		if (eq === -1) {
+			continue;
+		}
 		const key = line.slice(0, eq).trim();
 		const val = line.slice(eq + 1).trim();
-		if (key && !process.env[key]) process.env[key] = val;
+		if (key && !process.env[key]) {
+			process.env[key] = val;
+		}
 	}
 }
 

@@ -23,7 +23,9 @@
 				content = draft.content ?? content;
 				onchange(note.id, { title, content });
 			}
-		} catch {}
+		} catch {
+			// An unreadable or malformed draft is discarded; the saved note stands.
+		}
 	});
 
 	onDestroy(() => {

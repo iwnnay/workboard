@@ -69,7 +69,9 @@
 	function attachLeft(node: HTMLElement) {
 		leftEl = node;
 		const onScroll = () => {
-			if (syncing || !rightEl) return;
+			if (syncing || !rightEl) {
+				return;
+			}
 			syncing = true;
 			rightEl.scrollTop = node.scrollTop;
 			syncing = false;
@@ -84,7 +86,9 @@
 	function attachRight(node: HTMLElement) {
 		rightEl = node;
 		const onScroll = () => {
-			if (syncing || !leftEl) return;
+			if (syncing || !leftEl) {
+				return;
+			}
 			syncing = true;
 			leftEl.scrollTop = node.scrollTop;
 			syncing = false;

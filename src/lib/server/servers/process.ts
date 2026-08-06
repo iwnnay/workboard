@@ -17,7 +17,9 @@ export function logPathFor(serverId: string): string {
 }
 
 export function isProcessAlive(pid: number | null | undefined): boolean {
-	if (!pid || pid <= 0) return false;
+	if (!pid || pid <= 0) {
+		return false;
+	}
 	try {
 		process.kill(pid, 0);
 		return true;
@@ -34,7 +36,9 @@ export async function readLogTail(logPath: string, lineCount = 20): Promise<stri
 	try {
 		const content = await readFile(logPath, 'utf8');
 		const lines = content.split(/\r?\n/);
-		while (lines.length > 0 && lines[lines.length - 1] === '') lines.pop();
+		while (lines.length > 0 && lines[lines.length - 1] === '') {
+			lines.pop();
+		}
 		return lines.slice(-lineCount).join('\n');
 	} catch {
 		return '';
@@ -111,15 +115,25 @@ export function parseNetstatListeningPids(stdout: string, port: number): number[
 
 	for (const line of stdout.split(/\r?\n/)) {
 		const columns = line.trim().split(/\s+/);
-		if (columns.length < 5) continue;
+		if (columns.length < 5) {
+			continue;
+		}
 
 		const [protocol, localAddress, , state, pidColumn] = columns;
-		if (protocol.toLowerCase() !== 'tcp') continue;
-		if (state.toLowerCase() !== 'listening') continue;
-		if (!localAddress.endsWith(`:${port}`)) continue;
+		if (protocol.toLowerCase() !== 'tcp') {
+			continue;
+		}
+		if (state.toLowerCase() !== 'listening') {
+			continue;
+		}
+		if (!localAddress.endsWith(`:${port}`)) {
+			continue;
+		}
 
 		const pid = Number(pidColumn);
-		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) pids.push(pid);
+		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) {
+			pids.push(pid);
+		}
 	}
 
 	return pids;
@@ -130,7 +144,9 @@ export function parseLsofPids(stdout: string): number[] {
 
 	for (const line of stdout.split(/\r?\n/)) {
 		const pid = Number(line.trim());
-		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) pids.push(pid);
+		if (Number.isInteger(pid) && pid > 0 && !pids.includes(pid)) {
+			pids.push(pid);
+		}
 	}
 
 	return pids;
@@ -156,7 +172,9 @@ export async function findPortOwnerPid(port: number): Promise<number | null> {
 }
 
 export async function stopProcessTree(pid: number): Promise<void> {
-	if (!isProcessAlive(pid)) return;
+	if (!isProcessAlive(pid)) {
+		return;
+	}
 
 	if (process.platform === 'win32') {
 		try {
@@ -174,12 +192,18 @@ export async function stopProcessTree(pid: number): Promise<void> {
 	} else {
 		killPosixTree(pid, 'SIGTERM');
 		const deadline = Date.now() + STOP_TIMEOUT_MS / 2;
-		while (isProcessAlive(pid) && Date.now() < deadline) await wait(STOP_POLL_MS);
-		if (isProcessAlive(pid)) killPosixTree(pid, 'SIGKILL');
+		while (isProcessAlive(pid) && Date.now() < deadline) {
+			await wait(STOP_POLL_MS);
+		}
+		if (isProcessAlive(pid)) {
+			killPosixTree(pid, 'SIGKILL');
+		}
 	}
 
 	const deadline = Date.now() + STOP_TIMEOUT_MS;
-	while (isProcessAlive(pid) && Date.now() < deadline) await wait(STOP_POLL_MS);
+	while (isProcessAlive(pid) && Date.now() < deadline) {
+		await wait(STOP_POLL_MS);
+	}
 
 	if (isProcessAlive(pid)) {
 		throw new Error(

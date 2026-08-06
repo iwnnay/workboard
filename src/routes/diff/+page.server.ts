@@ -17,7 +17,9 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 	let cwd = process.cwd();
 	if (projectId) {
 		const found = projects.find((p) => p.id === projectId);
-		if (found) cwd = found.path;
+		if (found) {
+			cwd = found.path;
+		}
 	}
 
 	try {

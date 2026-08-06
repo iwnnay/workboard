@@ -2,11 +2,6 @@ import type { ServerType } from './types';
 
 export const DEFAULT_DOCKER_COMMAND = 'docker compose up -d';
 export const DEFAULT_DOCKER_STOP_COMMAND = 'docker compose down';
-export const SERVER_TYPE_LABELS: Record<ServerType, string> = {
-	python: 'Python (uv)',
-	node: 'Svelte (npm)'
-};
-
 export function isServerType(value: unknown): value is ServerType {
 	return value === 'python' || value === 'node';
 }
@@ -29,8 +24,12 @@ export function parsePort(value: unknown): number {
 }
 
 export function buildStartCommand(serverType: ServerType): string {
-	if (serverType === 'python') return 'uv run start_server';
-	if (serverType === 'node') return 'npm run dev';
+	if (serverType === 'python') {
+		return 'uv run start_server';
+	}
+	if (serverType === 'node') {
+		return 'npm run dev';
+	}
 	throw new Error(
 		`building start command: unknown server type ${JSON.stringify(serverType)}; expected "python" or "node"`
 	);
@@ -43,10 +42,14 @@ export function describeStartCommand(serverType: ServerType, port: number): stri
 
 export function deriveDockerStopCommand(startCommand: string): string {
 	const trimmed = startCommand.trim();
-	if (!trimmed) return DEFAULT_DOCKER_STOP_COMMAND;
+	if (!trimmed) {
+		return DEFAULT_DOCKER_STOP_COMMAND;
+	}
 
 	const composeUp = /^(.*?(?:docker\s+compose|docker-compose)\b.*?)\s+up\b.*$/i.exec(trimmed);
-	if (composeUp) return `${composeUp[1]} down`;
+	if (composeUp) {
+		return `${composeUp[1]} down`;
+	}
 
 	return DEFAULT_DOCKER_STOP_COMMAND;
 }

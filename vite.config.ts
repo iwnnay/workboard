@@ -9,11 +9,6 @@ export default defineConfig({
 	},
 	test: {
 		expect: { requireAssertions: true },
-		webServer: {
-			command: 'yarn test:dev',
-			port: 7002,
-			reuseExistingServer: !process.env.CI
-		},
 		projects: [
 			{
 				extends: './vite.config.ts',
@@ -24,7 +19,10 @@ export default defineConfig({
 						provider: playwright(),
 						instances: [{ browser: 'chromium', headless: true }]
 					},
-					include: ['tests/**/*.svelte.{test,spec}.{js,ts}'],
+					include: [
+						'tests/**/*.svelte.{test,spec}.{js,ts}',
+						'tests/components/**/*.{test,spec}.ts'
+					],
 					exclude: ['tests/lib/server/**']
 				}
 			},
@@ -35,7 +33,7 @@ export default defineConfig({
 					name: 'server',
 					environment: 'node',
 					include: ['tests/**/*.{test,spec}.{js,ts}'],
-					exclude: ['tests/**/*.svelte.{test,spec}.{js,ts}']
+					exclude: ['tests/**/*.svelte.{test,spec}.{js,ts}', 'tests/components/**']
 				}
 			}
 		]

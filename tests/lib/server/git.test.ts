@@ -20,8 +20,12 @@ function fileDiff(opts: {
 	const oldPath = opts.oldPath ?? path;
 	const lines: string[] = [`diff --git a/${oldPath} b/${path}`];
 
-	if (opts.isNew) lines.push('new file mode 100644');
-	if (opts.isDeleted) lines.push('deleted file mode 100644');
+	if (opts.isNew) {
+		lines.push('new file mode 100644');
+	}
+	if (opts.isDeleted) {
+		lines.push('deleted file mode 100644');
+	}
 	if (opts.isBinary) {
 		lines.push(`Binary files a/${oldPath} and b/${path} differ`);
 		return lines.join('\n');

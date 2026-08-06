@@ -57,7 +57,9 @@
 	}
 
 	async function selectFile(path: string) {
-		if (selectedPath === path && fileInfo) return;
+		if (selectedPath === path && fileInfo) {
+			return;
+		}
 		selectedPath = path;
 		viewMode = 'summary';
 		fileInfo = null;
@@ -66,19 +68,26 @@
 			const res = await fetch(
 				`/api/docs/file?projectId=${encodeURIComponent(projectId)}&path=${encodeURIComponent(path)}`
 			);
-			if (res.ok) fileInfo = await res.json();
+			if (res.ok) {
+				fileInfo = await res.json();
+			}
 		} finally {
 			loadingFile = false;
 		}
 	}
 
 	function toggleDir(path: string) {
-		if (expanded.has(path)) expanded.delete(path);
-		else expanded.add(path);
+		if (expanded.has(path)) {
+			expanded.delete(path);
+		} else {
+			expanded.add(path);
+		}
 	}
 
 	async function addProject() {
-		if (!newName.trim() || !newPath.trim()) return;
+		if (!newName.trim() || !newPath.trim()) {
+			return;
+		}
 		const res = await fetch('/api/projects', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -97,12 +106,18 @@
 	async function removeProject(id: string) {
 		await fetch(`/api/projects/${id}`, { method: 'DELETE' });
 		projects = projects.filter((p) => p.id !== id);
-		if (projectId === id) projectId = projects[0]?.id ?? '';
+		if (projectId === id) {
+			projectId = projects[0]?.id ?? '';
+		}
 	}
 
 	function formatSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`;
-		if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+		if (bytes < 1024) {
+			return `${bytes} B`;
+		}
+		if (bytes < 1048576) {
+			return `${(bytes / 1024).toFixed(1)} KB`;
+		}
 		return `${(bytes / 1048576).toFixed(1)} MB`;
 	}
 

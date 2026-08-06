@@ -22,7 +22,9 @@ export function isPortListening(port: number, host = '127.0.0.1'): Promise<boole
 		let settled = false;
 
 		const finish = (listening: boolean) => {
-			if (settled) return;
+			if (settled) {
+				return;
+			}
 			settled = true;
 			socket.destroy();
 			resolvePromise(listening);
@@ -48,16 +50,22 @@ type ComposePsRow = {
  */
 export function parseComposePs(stdout: string): DockerServiceStatus[] {
 	const trimmed = stdout.trim();
-	if (!trimmed) return [];
+	if (!trimmed) {
+		return [];
+	}
 
 	const rows: ComposePsRow[] = [];
 	if (trimmed.startsWith('[')) {
 		const parsed = JSON.parse(trimmed);
-		if (Array.isArray(parsed)) rows.push(...parsed);
+		if (Array.isArray(parsed)) {
+			rows.push(...parsed);
+		}
 	} else {
 		for (const line of trimmed.split(/\r?\n/)) {
 			const candidate = line.trim();
-			if (!candidate.startsWith('{')) continue;
+			if (!candidate.startsWith('{')) {
+				continue;
+			}
 			rows.push(JSON.parse(candidate));
 		}
 	}
@@ -71,9 +79,13 @@ export function parseComposePs(stdout: string): DockerServiceStatus[] {
 export function summariseDockerState(
 	services: DockerServiceStatus[]
 ): 'running' | 'partial' | 'stopped' {
-	if (services.length === 0) return 'stopped';
+	if (services.length === 0) {
+		return 'stopped';
+	}
 	const running = services.filter((service) => RUNNING_STATES.has(service.state)).length;
-	if (running === 0) return 'stopped';
+	if (running === 0) {
+		return 'stopped';
+	}
 	return running === services.length ? 'running' : 'partial';
 }
 

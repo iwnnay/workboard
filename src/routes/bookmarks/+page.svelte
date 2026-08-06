@@ -16,7 +16,9 @@
 		bookmarks.reduce(
 			(acc, b) => {
 				const key = b.folderId ?? '';
-				if (!acc[key]) acc[key] = [];
+				if (!acc[key]) {
+					acc[key] = [];
+				}
 				acc[key].push(b);
 				return acc;
 			},
@@ -58,7 +60,9 @@
 
 	async function createFolder() {
 		const name = newFolderName.trim();
-		if (!name) return;
+		if (!name) {
+			return;
+		}
 		const created = await api.post<BookmarkFolder>('/api/bookmark-folders', { name });
 		folders = [...folders, created].sort((a, b) => a.name.localeCompare(b.name));
 		newFolderName = '';
@@ -81,7 +85,9 @@
 				placeholder="Folder name..."
 				autofocus
 				onkeydown={(e) => {
-					if (e.key === 'Enter') createFolder();
+					if (e.key === 'Enter') {
+						createFolder();
+					}
 					if (e.key === 'Escape') {
 						showAddFolder = false;
 						newFolderName = '';

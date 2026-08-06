@@ -45,7 +45,9 @@
 					);
 				}
 				const core = await import('./file-editor-core');
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				baseHash = payload.baseHash;
 				eol = payload.eol;
 				editorHandle = core.createFileEditor({
@@ -60,7 +62,9 @@
 				});
 				phase = 'ready';
 			} catch (caught) {
-				if (cancelled) return;
+				if (cancelled) {
+					return;
+				}
 				loadError = (caught as Error).message;
 				phase = 'error';
 			}
@@ -74,7 +78,9 @@
 	});
 
 	async function save(options: { force?: boolean } = {}): Promise<boolean> {
-		if (saving || phase !== 'ready' || !editorHandle) return false;
+		if (saving || phase !== 'ready' || !editorHandle) {
+			return false;
+		}
 		saving = true;
 		statusMessage = '';
 		try {
@@ -123,14 +129,18 @@
 	}
 
 	function handleCloseClick() {
-		if (dirty && !confirm(`Discard unsaved changes to ${filePath}?`)) return;
+		if (dirty && !confirm(`Discard unsaved changes to ${filePath}?`)) {
+			return;
+		}
 		onClose(didSave);
 	}
 </script>
 
 <svelte:window
 	onbeforeunload={(event) => {
-		if (dirty) event.preventDefault();
+		if (dirty) {
+			event.preventDefault();
+		}
 	}}
 />
 

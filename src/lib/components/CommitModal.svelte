@@ -1,10 +1,7 @@
 <script lang="ts">
-	/**
-	 * Commit modal: shows `git status` for the selected project and takes a
-	 * commit message. Commits whatever is STAGED (the Stage / Stage all buttons
-	 * put it there) — this dialog never stages anything itself.
-	 */
 	import { onMount } from 'svelte';
+	import Modal from '$lib/components/Modal.svelte';
+	import { diffApi } from '$lib/diff-api';
 
 	let {
 		projectId,
@@ -25,25 +22,28 @@
 	let commitError = $state('');
 	let pushAfterCommit = $state(false);
 
-	// Set when the commit landed but the push didn't, so the dialog stops offering
-	// to commit again — the message is already in a commit.
+	/** The commit landed but its push did not, so there is nothing left to commit. */
 	let committed = $state(false);
 	let pushError = $state('');
 
 	let messageBox = $state<HTMLTextAreaElement | null>(null);
 
+	const pushErrorText = $derived(
+		pushError ? `The commit succeeded. The push did not:\n${pushError}` : ''
+	);
+
+	const commitLabel = $derived.by(() => {
+		if (committing) {
+			return pushAfterCommit ? 'Committing & pushing…' : 'Committing…';
+		}
+		return pushAfterCommit ? 'Commit & push' : 'Commit';
+	});
+
 	async function loadStatus() {
 		statusLoading = true;
 		statusError = '';
 		try {
-			const response = await fetch(`/api/diff/status?projectId=${encodeURIComponent(projectId)}`);
-			const payload = await response.json();
-			if (!response.ok) {
-				throw new Error(
-					payload.error ?? `reading git status: request failed with status ${response.status}`
-				);
-			}
-			statusText = payload.status;
+			statusText = (await diffApi.status(projectId)).status;
 		} catch (caught) {
 			statusError = (caught as Error).message;
 		} finally {
@@ -56,39 +56,20 @@
 		messageBox?.focus();
 	});
 
-	const pushErrorText = $derived(
-		pushError ? `The commit succeeded. The push did not:\n${pushError}` : ''
-	);
-
-	const commitLabel = $derived.by(() => {
-		if (committing) return pushAfterCommit ? 'Committing & pushing…' : 'Committing…';
-		return pushAfterCommit ? 'Commit & push' : 'Commit';
-	});
-
 	async function commit() {
-		if (committing || committed || !message.trim()) return;
+		if (committing || committed || !message.trim()) {
+			return;
+		}
 		committing = true;
 		commitError = '';
 		pushError = '';
 		try {
-			const response = await fetch('/api/diff/commit', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ projectId, message, push: pushAfterCommit })
-			});
-			const payload = await response.json();
-			if (!response.ok) {
-				throw new Error(
-					payload.error ?? `committing changes: request failed with status ${response.status}`
-				);
-			}
-
-			// The commit is in either way, so the diff view is refreshed either way.
+			const result = await diffApi.commit(projectId, message, pushAfterCommit);
 			onCommitted();
 
-			if (payload.pushError) {
+			if (result.pushError) {
 				committed = true;
-				pushError = payload.pushError;
+				pushError = result.pushError;
 				return;
 			}
 			onClose();
@@ -99,12 +80,7 @@
 		}
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && !committing) {
-			onClose();
-			return;
-		}
-		// Ctrl/Cmd+Enter commits from anywhere in the dialog, including the textarea.
+	function onKeydown(event: KeyboardEvent) {
 		if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
 			event.preventDefault();
 			void commit();
@@ -112,148 +88,61 @@
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
+<svelte:window onkeydown={onKeydown} />
 
-<div
-	class="overlay"
-	role="presentation"
-	onclick={(event) => {
-		if (event.target === event.currentTarget && !committing) onClose();
-	}}
->
-	<div
-		class="modal"
-		role="dialog"
-		aria-modal="true"
-		aria-label="Commit staged changes"
-		tabindex="-1"
-	>
-		<header class="modal-head">
-			<h2 class="modal-title">Commit</h2>
-			<span class="spacer"></span>
-			<button class="close-btn" aria-label="Close" disabled={committing} onclick={onClose}>✕</button
-			>
-		</header>
-
-		<div class="status-body">
-			{#if statusLoading}
-				<div class="msg">Reading git status…</div>
-			{:else if statusError}
-				<div class="msg error">{statusError}</div>
-			{:else}
-				<pre class="status-out">{statusText}</pre>
-			{/if}
-		</div>
-
-		<div class="message-wrap">
-			<label class="message-label" for="commit-message">Commit message</label>
-			<textarea
-				id="commit-message"
-				class="message-input"
-				bind:this={messageBox}
-				bind:value={message}
-				placeholder="What changed and why…"
-				rows="4"
-				spellcheck="true"
-				disabled={committing || committed}
-			></textarea>
-		</div>
-
-		{#if commitError}
-			<div class="commit-error">{commitError}</div>
+<Modal title="Commit" label="Commit staged changes" maxWidth="760px" locked={committing} {onClose}>
+	<div class="status-body">
+		{#if statusLoading}
+			<div class="msg">Reading git status…</div>
+		{:else if statusError}
+			<div class="msg error">{statusError}</div>
+		{:else}
+			<pre class="status-out">{statusText}</pre>
 		{/if}
-
-		{#if pushErrorText}
-			<div class="commit-error">{pushErrorText}</div>
-		{/if}
-
-		<footer class="modal-foot">
-			<label class="push-flag">
-				<input type="checkbox" bind:checked={pushAfterCommit} disabled={committing || committed} />
-				<span>Push after commit</span>
-			</label>
-			<span class="hint">Commits staged changes · Ctrl+Enter</span>
-			<button class="cancel-btn" disabled={committing} onclick={onClose}>
-				{committed ? 'Close' : 'Cancel'}
-			</button>
-			<button
-				class="commit-btn"
-				disabled={committing || committed || !message.trim()}
-				onclick={commit}
-			>
-				{commitLabel}
-			</button>
-		</footer>
 	</div>
-</div>
+
+	<div class="message-wrap">
+		<label class="message-label" for="commit-message">Commit message</label>
+		<textarea
+			id="commit-message"
+			class="message-input"
+			bind:this={messageBox}
+			bind:value={message}
+			placeholder="What changed and why…"
+			rows="4"
+			spellcheck="true"
+			disabled={committing || committed}
+		></textarea>
+	</div>
+
+	{#if commitError}
+		<div class="commit-error">{commitError}</div>
+	{/if}
+
+	{#if pushErrorText}
+		<div class="commit-error">{pushErrorText}</div>
+	{/if}
+
+	{#snippet footer()}
+		<label class="push-flag">
+			<input type="checkbox" bind:checked={pushAfterCommit} disabled={committing || committed} />
+			<span>Push after commit</span>
+		</label>
+		<span class="hint">Commits staged changes · Ctrl+Enter</span>
+		<button class="cancel-btn" disabled={committing} onclick={onClose}>
+			{committed ? 'Close' : 'Cancel'}
+		</button>
+		<button
+			class="commit-btn"
+			disabled={committing || committed || !message.trim()}
+			onclick={commit}
+		>
+			{commitLabel}
+		</button>
+	{/snippet}
+</Modal>
 
 <style>
-	.overlay {
-		position: fixed;
-		inset: 0;
-		z-index: 200;
-		background: rgba(0, 0, 0, 0.6);
-		display: flex;
-		align-items: center;
-		justify-content: center;
-		padding: 1.5rem;
-	}
-
-	.modal {
-		width: 100%;
-		max-width: 760px;
-		max-height: 85vh;
-		display: flex;
-		flex-direction: column;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 10px;
-		box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
-		overflow: hidden;
-	}
-
-	.modal-head {
-		display: flex;
-		align-items: center;
-		gap: 0.75rem;
-		padding: 0.875rem 1rem;
-		border-bottom: 1px solid var(--border);
-		flex-shrink: 0;
-	}
-
-	.modal-title {
-		font-size: 0.9rem;
-		font-weight: 600;
-		color: var(--text);
-		text-transform: uppercase;
-		letter-spacing: 0.05em;
-		flex-shrink: 0;
-	}
-
-	.spacer {
-		flex: 1;
-	}
-
-	.close-btn {
-		color: var(--text-ghost);
-		font-size: 0.85rem;
-		padding: 0.25rem 0.4rem;
-		border-radius: 4px;
-		transition:
-			background 0.1s,
-			color 0.1s;
-	}
-
-	.close-btn:hover:not(:disabled) {
-		background: var(--accent-bg);
-		color: var(--accent);
-	}
-
-	.close-btn:disabled {
-		opacity: 0.5;
-		cursor: default;
-	}
-
 	.status-body {
 		flex: 1;
 		min-height: 120px;
@@ -318,7 +207,6 @@
 		line-height: 1.5;
 		padding: 0.5rem 0.625rem;
 		outline: none;
-		transition: border-color 0.15s;
 	}
 
 	.message-input:focus {
@@ -346,15 +234,6 @@
 		word-break: break-word;
 		max-height: 140px;
 		overflow-y: auto;
-	}
-
-	.modal-foot {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-		padding: 0.75rem 1rem;
-		border-top: 1px solid var(--border);
-		flex-shrink: 0;
 	}
 
 	.push-flag {
@@ -385,9 +264,6 @@
 		border-radius: 5px;
 		color: var(--text-dim);
 		font-size: 0.8125rem;
-		transition:
-			border-color 0.15s,
-			color 0.15s;
 	}
 
 	.cancel-btn:hover:not(:disabled) {
@@ -402,7 +278,6 @@
 		border-radius: 5px;
 		color: var(--accent);
 		font-size: 0.8125rem;
-		transition: opacity 0.1s;
 	}
 
 	.commit-btn:hover:not(:disabled) {

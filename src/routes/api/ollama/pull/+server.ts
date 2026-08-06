@@ -10,7 +10,9 @@ const DEFAULT_HOST = 'http://127.0.0.1:11434';
  */
 export const POST: RequestHandler = async ({ request, fetch }) => {
 	const { model, host = DEFAULT_HOST } = await request.json();
-	if (!model || typeof model !== 'string') throw error(400, 'model is required');
+	if (!model || typeof model !== 'string') {
+		throw error(400, 'model is required');
+	}
 
 	const base = String(host).replace(/\/+$/, '');
 

@@ -22,7 +22,9 @@ async function makeProject(
 	const entries = Array.isArray(files)
 		? files.map((file) => [file, ''] as const)
 		: Object.entries(files);
-	for (const [file, contents] of entries) await writeFile(join(directory, file), contents);
+	for (const [file, contents] of entries) {
+		await writeFile(join(directory, file), contents);
+	}
 	return directory;
 }
 
@@ -249,7 +251,9 @@ describe('listDirectories', () => {
 
 	it('has no parent at a filesystem root', async () => {
 		let filesystemRoot = resolve(root);
-		while (dirname(filesystemRoot) !== filesystemRoot) filesystemRoot = dirname(filesystemRoot);
+		while (dirname(filesystemRoot) !== filesystemRoot) {
+			filesystemRoot = dirname(filesystemRoot);
+		}
 
 		const listing = await listDirectories(filesystemRoot);
 

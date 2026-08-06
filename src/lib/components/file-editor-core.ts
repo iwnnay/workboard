@@ -61,7 +61,9 @@ function hasBang(params?: ExCommandParams): boolean {
 }
 
 function registerExCommands() {
-	if (exCommandsRegistered) return;
+	if (exCommandsRegistered) {
+		return;
+	}
 	exCommandsRegistered = true;
 	Vim.defineEx('write', 'w', () => {
 		void activeHandlers?.save();
@@ -72,7 +74,9 @@ function registerExCommands() {
 	Vim.defineEx('wq', 'wq', () => {
 		const handlers = activeHandlers;
 		void handlers?.save().then((saved) => {
-			if (saved && activeHandlers === handlers) handlers.requestClose({ force: true });
+			if (saved && activeHandlers === handlers) {
+				handlers.requestClose({ force: true });
+			}
 		});
 	});
 }
@@ -211,7 +215,9 @@ export function createFileEditor(options: {
 			languageExtension(filePath),
 			editorTheme,
 			EditorView.updateListener.of((update) => {
-				if (!update.docChanged || !lastSavedDoc) return;
+				if (!update.docChanged || !lastSavedDoc) {
+					return;
+				}
 				const dirty = !update.state.doc.eq(lastSavedDoc);
 				if (dirty !== lastDirty) {
 					lastDirty = dirty;
@@ -248,7 +254,9 @@ export function createFileEditor(options: {
 			}
 		},
 		destroy: () => {
-			if (activeHandlers === handlers) activeHandlers = null;
+			if (activeHandlers === handlers) {
+				activeHandlers = null;
+			}
 			view.destroy();
 		}
 	};

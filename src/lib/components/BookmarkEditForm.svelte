@@ -22,7 +22,9 @@
 			bind:value={draft.name}
 			placeholder="Name"
 			onkeydown={(e) => {
-				if (e.key === 'Escape') onCancel();
+				if (e.key === 'Escape') {
+					onCancel();
+				}
 			}}
 		/>
 		<input
@@ -30,8 +32,12 @@
 			bind:value={draft.url}
 			placeholder="URL"
 			onkeydown={(e) => {
-				if (e.key === 'Enter') onSave();
-				if (e.key === 'Escape') onCancel();
+				if (e.key === 'Enter') {
+					onSave();
+				}
+				if (e.key === 'Escape') {
+					onCancel();
+				}
 			}}
 		/>
 		<button class="icon-btn" onclick={onSave} aria-label="Save">✓</button>

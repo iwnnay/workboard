@@ -15,7 +15,9 @@
 	let saveTimer: ReturnType<typeof setTimeout>;
 
 	$effect(() => {
-		if (open) setTimeout(() => textareaEl?.focus(), 0);
+		if (open) {
+			setTimeout(() => textareaEl?.focus(), 0);
+		}
 	});
 
 	function scheduleSave() {
@@ -40,7 +42,9 @@
 	}
 
 	function handleOverlayKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') close();
+		if (e.key === 'Escape') {
+			close();
+		}
 	}
 </script>
 

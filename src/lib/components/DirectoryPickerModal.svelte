@@ -49,7 +49,9 @@
 		const releasedOnBackdrop = event.target === event.currentTarget;
 		const shouldClose = pressStartedOnBackdrop && releasedOnBackdrop;
 		pressStartedOnBackdrop = false;
-		if (shouldClose) onClose();
+		if (shouldClose) {
+			onClose();
+		}
 	}
 </script>
 

@@ -11,16 +11,22 @@ import hljs from 'highlight.js';
 export const GET: RequestHandler = async ({ url }) => {
 	const projectId = url.searchParams.get('projectId') ?? '';
 	const filePath = url.searchParams.get('path') ?? '';
-	if (!filePath) return json({ error: 'missing path' }, { status: 400 });
+	if (!filePath) {
+		return json({ error: 'missing path' }, { status: 400 });
+	}
 
 	let root = process.cwd();
 	if (projectId) {
 		const rows = await db.select().from(project).where(eq(project.id, projectId));
-		if (rows[0]) root = rows[0].path;
+		if (rows[0]) {
+			root = rows[0].path;
+		}
 	}
 
 	const abs = resolve(join(root, filePath));
-	if (!abs.startsWith(resolve(root))) return json({ error: 'forbidden' }, { status: 403 });
+	if (!abs.startsWith(resolve(root))) {
+		return json({ error: 'forbidden' }, { status: 403 });
+	}
 
 	let content: string;
 	try {
@@ -29,7 +35,9 @@ export const GET: RequestHandler = async ({ url }) => {
 		return json({ error: 'not found' }, { status: 404 });
 	}
 
-	if (content.includes('\0')) return json({ error: 'binary file' }, { status: 415 });
+	if (content.includes('\0')) {
+		return json({ error: 'binary file' }, { status: 415 });
+	}
 
 	const st = statSync(abs);
 	const lineCount = content.split('\n').length;

@@ -16,13 +16,17 @@
 			const qs = file ? `?file=${encodeURIComponent(file)}` : '';
 			const res = await fetch(`/api/ollama/logs${qs}`);
 			data = res.ok ? await res.json() : null;
-			if (data && !file) file = data.file;
+			if (data && !file) {
+				file = data.file;
+			}
 		} finally {
 			loading = false;
 			if (scrollToBottom) {
 				// Wait for the new lines to render before scrolling.
 				requestAnimationFrame(() => {
-					if (logBody) logBody.scrollTop = logBody.scrollHeight;
+					if (logBody) {
+						logBody.scrollTop = logBody.scrollHeight;
+					}
 				});
 			}
 		}
@@ -40,21 +44,31 @@
 		const lines = data?.lines ?? [];
 		const q = search.trim().toLowerCase();
 		return lines.filter((l) => {
-			if (errorsOnly && !isError(l)) return false;
-			if (q && !l.toLowerCase().includes(q)) return false;
+			if (errorsOnly && !isError(l)) {
+				return false;
+			}
+			if (q && !l.toLowerCase().includes(q)) {
+				return false;
+			}
 			return true;
 		});
 	});
 
 	function selectFile(name: string) {
-		if (name === file) return;
+		if (name === file) {
+			return;
+		}
 		file = name;
 		void load(true);
 	}
 
 	function formatSize(bytes: number): string {
-		if (bytes < 1024) return `${bytes} B`;
-		if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
+		if (bytes < 1024) {
+			return `${bytes} B`;
+		}
+		if (bytes < 1048576) {
+			return `${(bytes / 1024).toFixed(1)} KB`;
+		}
 		return `${(bytes / 1048576).toFixed(1)} MB`;
 	}
 </script>
@@ -65,7 +79,9 @@
 	class="overlay"
 	role="presentation"
 	onclick={(e) => {
-		if (e.target === e.currentTarget) onClose();
+		if (e.target === e.currentTarget) {
+			onClose();
+		}
 	}}
 >
 	<div class="modal" role="dialog" aria-modal="true" aria-label="Ollama logs" tabindex="-1">

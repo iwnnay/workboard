@@ -6,15 +6,23 @@
 	let input = $state('');
 
 	function queueModels() {
-		if (!input.trim()) return;
+		if (!input.trim()) {
+			return;
+		}
 		pullQueue.add(input, host);
 		input = '';
 	}
 
 	function formatSize(bytes: number | undefined): string {
-		if (!bytes) return '';
-		if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`;
-		if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+		if (!bytes) {
+			return '';
+		}
+		if (bytes < 1048576) {
+			return `${(bytes / 1024).toFixed(0)} KB`;
+		}
+		if (bytes < 1073741824) {
+			return `${(bytes / 1048576).toFixed(1)} MB`;
+		}
 		return `${(bytes / 1073741824).toFixed(2)} GB`;
 	}
 
@@ -29,7 +37,9 @@
 	class="overlay"
 	role="presentation"
 	onclick={(e) => {
-		if (e.target === e.currentTarget) onClose();
+		if (e.target === e.currentTarget) {
+			onClose();
+		}
 	}}
 >
 	<div class="modal" role="dialog" aria-modal="true" aria-label="Pull models" tabindex="-1">

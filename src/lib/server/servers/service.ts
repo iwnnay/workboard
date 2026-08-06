@@ -16,6 +16,7 @@ import {
 	parsePort,
 	DEFAULT_DOCKER_COMMAND
 } from '$lib/start-command';
+import { notFound } from '$lib/server/http';
 import { aliasFromDirectory, detectServer } from './detect';
 import {
 	findPortOwnerPid,
@@ -25,12 +26,10 @@ import {
 	spawnBackgroundCommand,
 	stopProcessTree
 } from './process';
+import { decideProcessRecord, needsPortOwnerLookup } from './reconcile';
 import { isPortListening, probeServerStatus } from './status';
 
 type ManagedServerRow = typeof managedServer.$inferSelect;
-
-/** Raised when an id doesn't match a row, so routes can answer 404. */
-export class ManagedServerNotFoundError extends Error {}
 
 function toManagedServer(row: ManagedServerRow): ManagedServer {
 	if (!isServerType(row.serverType)) {
@@ -98,9 +97,7 @@ export async function listServers(): Promise<ManagedServer[]> {
 export async function getServer(id: string): Promise<ManagedServer> {
 	const rows = await db.select().from(managedServer).where(eq(managedServer.id, id));
 	if (!rows[0]) {
-		throw new ManagedServerNotFoundError(
-			`loading managed server ${id}: no such row in the managed_server table`
-		);
+		throw notFound(`loading managed server ${id}: no such row in the managed_server table`);
 	}
 	return toManagedServer(rows[0]);
 }
@@ -155,27 +152,26 @@ async function reconcileProcessRecord(
 	server: ManagedServer,
 	status: ServerStatus
 ): Promise<{ server: ManagedServer; status: ServerStatus }> {
-	if (status.process.state === 'running') return { server, status };
-	if (server.pid === null) return { server, status };
+	const portOwnerPid = needsPortOwnerLookup(server, status)
+		? await findPortOwnerPid(server.port)
+		: null;
+	const decision = decideProcessRecord(server, status, portOwnerPid, new Date().toISOString());
 
-	if (status.port.listening) {
-		if (server.docker) return { server, status };
-
-		const ownerPid = await findPortOwnerPid(server.port);
-		if (ownerPid === null) {
-			return { server, status };
-		}
-
-		const startedAt = server.startedAt ?? new Date().toISOString();
-		await adoptProcessRecord(server.id, ownerPid, startedAt);
-		return {
-			server: { ...server, pid: ownerPid, startedAt },
-			status: { ...status, process: { state: 'running', pid: ownerPid, startedAt } }
-		};
+	if (decision.action === 'keep') {
+		return { server, status };
 	}
 
-	await clearProcessRecord(server.id);
-	return { server: { ...server, pid: null, startedAt: null }, status };
+	if (decision.action === 'clear') {
+		await clearProcessRecord(server.id);
+		return { server: { ...server, pid: null, startedAt: null }, status };
+	}
+
+	const { pid, startedAt } = decision;
+	await adoptProcessRecord(server.id, pid, startedAt);
+	return {
+		server: { ...server, pid, startedAt },
+		status: { ...status, process: { state: 'running', pid, startedAt } }
+	};
 }
 
 export async function checkServer(id: string): Promise<ServerStatus> {
@@ -231,9 +227,14 @@ export async function stopServer(id: string): Promise<ServerStatus> {
 		await runShellCommand(deriveDockerStopCommand(server.dockerCommand || ''), server.directory);
 	}
 
-	if (server.pid !== null && (await isPortListening(server.port))) {
+	// Whatever still holds the port after the recorded pid and any container are
+	// down is the server itself, orphaned behind a shell that already exited.
+	// Docker has come down by now, so this is never Docker's port proxy.
+	if (await isPortListening(server.port)) {
 		const ownerPid = await findPortOwnerPid(server.port);
-		if (ownerPid !== null && ownerPid !== server.pid) await stopProcessTree(ownerPid);
+		if (ownerPid !== null && ownerPid !== server.pid) {
+			await stopProcessTree(ownerPid);
+		}
 	}
 
 	await clearProcessRecord(id);

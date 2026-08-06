@@ -65,7 +65,9 @@ class PullQueue {
 	}
 
 	remove(item: PullItem) {
-		if (item.status === 'downloading') this.cancel(item);
+		if (item.status === 'downloading') {
+			this.cancel(item);
+		}
 		this.items = this.items.filter((q) => q.id !== item.id);
 	}
 
@@ -74,7 +76,9 @@ class PullQueue {
 	}
 
 	private async process() {
-		if (this.processing) return;
+		if (this.processing) {
+			return;
+		}
 		this.processing = true;
 		try {
 			let item: PullItem | undefined;
@@ -98,30 +102,40 @@ class PullQueue {
 				body: JSON.stringify({ model: item.model, host: item.host }),
 				signal: controller.signal
 			});
-			if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+			if (!res.ok || !res.body) {
+				throw new Error(`HTTP ${res.status}`);
+			}
 
 			const reader = res.body.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';
 			for (;;) {
 				const { done, value } = await reader.read();
-				if (done) break;
+				if (done) {
+					break;
+				}
 				buffer += decoder.decode(value, { stream: true });
 				let nl: number;
 				while ((nl = buffer.indexOf('\n')) >= 0) {
 					const line = buffer.slice(0, nl).trim();
 					buffer = buffer.slice(nl + 1);
-					if (line) this.handleLine(item, line);
+					if (line) {
+						this.handleLine(item, line);
+					}
 				}
 			}
-			if (buffer.trim()) this.handleLine(item, buffer.trim());
+			if (buffer.trim()) {
+				this.handleLine(item, buffer.trim());
+			}
 
 			if (item.status === 'downloading') {
 				item.status = 'done';
 				item.percent = 100;
 				item.statusText = 'complete';
 			}
-			if (item.status === 'done') this.onComplete?.();
+			if (item.status === 'done') {
+				this.onComplete?.();
+			}
 		} catch (e) {
 			item.status = 'error';
 			if (controller.signal.aborted) {

@@ -87,15 +87,21 @@ export function parseFile(filePath: string): ParsedFile {
 	}
 
 	// Binary check
-	if (raw.includes('\0')) return empty(language);
+	if (raw.includes('\0')) {
+		return empty(language);
+	}
 
 	// For non-JS/TS/Svelte files, skip parsing
-	if (!['typescript', 'javascript', 'svelte'].includes(language)) return empty(language);
+	if (!['typescript', 'javascript', 'svelte'].includes(language)) {
+		return empty(language);
+	}
 
 	let src = raw;
 	if (ext === '.svelte') {
 		const match = raw.match(/<script[^>]*>([\s\S]*?)<\/script>/i);
-		if (!match) return empty(language);
+		if (!match) {
+			return empty(language);
+		}
 		const before = raw.slice(0, raw.indexOf(match[0])).split('\n').length - 1;
 		src = '\n'.repeat(before) + match[1];
 	}
@@ -157,7 +163,9 @@ function parseLines(lines: string[]) {
 			pendingDoc = undefined;
 			continue;
 		}
-		if (t.startsWith('//')) continue;
+		if (t.startsWith('//')) {
+			continue;
+		}
 
 		// Import (may span multiple lines)
 		if (t.startsWith('import ') && !t.startsWith('import type ')) {
@@ -167,7 +175,9 @@ function parseLines(lines: string[]) {
 				j++;
 				full += ' ' + lines[j].trim();
 			}
-			if (j > i) i = j;
+			if (j > i) {
+				i = j;
+			}
 
 			const m = full.match(/^import\s+(.+?)\s+from\s+['"](.+?)['"]/);
 			if (m) {
@@ -177,7 +187,9 @@ function parseLines(lines: string[]) {
 
 				if (!clause.startsWith('{') && !clause.startsWith('*')) {
 					const def = clause.match(/^(\w+)/);
-					if (def) defaultImport = def[1];
+					if (def) {
+						defaultImport = def[1];
+					}
 				}
 				const namedBlock = clause.match(/\{([^}]+)\}/);
 				if (namedBlock) {
@@ -279,7 +291,9 @@ function scanMethods(lines: string[], classIdx: number, info: ClassInfo) {
 			if (ch === '{') {
 				depth++;
 				entered = true;
-			} else if (ch === '}') depth--;
+			} else if (ch === '}') {
+				depth--;
+			}
 		}
 		if (entered && depth === 1 && k > classIdx) {
 			const t = lines[k].trim();
@@ -290,7 +304,9 @@ function scanMethods(lines: string[], classIdx: number, info: ClassInfo) {
 				info.methods.push({ name: m[1], line: k + 1, isAsync: /\basync\b/.test(t) });
 			}
 		}
-		if (entered && depth === 0) break;
+		if (entered && depth === 0) {
+			break;
+		}
 	}
 }
 

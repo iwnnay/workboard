@@ -17,7 +17,9 @@
 
 	async function addTodo() {
 		const text = newText.trim();
-		if (!text) return;
+		if (!text) {
+			return;
+		}
 		const res = await fetch('/api/todos', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },

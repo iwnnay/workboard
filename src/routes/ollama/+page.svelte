@@ -35,22 +35,36 @@
 	pullQueue.onComplete = load;
 
 	function formatSize(bytes: number | undefined): string {
-		if (!bytes) return '—';
-		if (bytes < 1024) return `${bytes} B`;
-		if (bytes < 1048576) return `${(bytes / 1024).toFixed(1)} KB`;
-		if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(1)} MB`;
+		if (!bytes) {
+			return '—';
+		}
+		if (bytes < 1024) {
+			return `${bytes} B`;
+		}
+		if (bytes < 1048576) {
+			return `${(bytes / 1024).toFixed(1)} KB`;
+		}
+		if (bytes < 1073741824) {
+			return `${(bytes / 1048576).toFixed(1)} MB`;
+		}
 		return `${(bytes / 1073741824).toFixed(2)} GB`;
 	}
 
 	function formatDate(s: string | undefined): string {
-		if (!s) return '—';
+		if (!s) {
+			return '—';
+		}
 		const d = new Date(s);
-		if (isNaN(d.getTime())) return s;
+		if (isNaN(d.getTime())) {
+			return s;
+		}
 		return d.toLocaleString();
 	}
 
 	function shortDigest(d: string | undefined): string {
-		if (!d) return '—';
+		if (!d) {
+			return '—';
+		}
 		return d.replace(/^sha256:/, '').slice(0, 12);
 	}
 
@@ -63,15 +77,20 @@
 	}
 
 	function toggleCap(cap: string) {
-		if (activeCaps.has(cap)) activeCaps.delete(cap);
-		else activeCaps.add(cap);
+		if (activeCaps.has(cap)) {
+			activeCaps.delete(cap);
+		} else {
+			activeCaps.add(cap);
+		}
 	}
 
 	// Every capability seen across the installed models, for the filter chips.
 	let allCapabilities = $derived.by(() => {
 		const set = new Set<string>();
 		for (const m of info?.models ?? []) {
-			for (const c of capsFor(m.name)) set.add(c);
+			for (const c of capsFor(m.name)) {
+				set.add(c);
+			}
 		}
 		return [...set].sort();
 	});
@@ -81,10 +100,14 @@
 		const q = search.trim().toLowerCase();
 		const caps = [...activeCaps];
 		return (info?.models ?? []).filter((m) => {
-			if (q && !m.name.toLowerCase().includes(q)) return false;
+			if (q && !m.name.toLowerCase().includes(q)) {
+				return false;
+			}
 			if (caps.length > 0) {
 				const mc = capsFor(m.name);
-				if (!caps.every((c) => mc.includes(c))) return false;
+				if (!caps.every((c) => mc.includes(c))) {
+					return false;
+				}
 			}
 			return true;
 		});

@@ -33,13 +33,17 @@
 	}
 
 	function startRename() {
-		if (!folder) return;
+		if (!folder) {
+			return;
+		}
 		nameDraft = folder.name;
 		renaming = true;
 	}
 
 	async function commitRename() {
-		if (!folder || !onSaveFolderName) return;
+		if (!folder || !onSaveFolderName) {
+			return;
+		}
 		const trimmed = nameDraft.trim();
 		if (!trimmed) {
 			renaming = false;
@@ -55,7 +59,9 @@
 	}
 
 	async function commitAdd() {
-		if (!newDraft.name.trim() || !newDraft.url.trim()) return;
+		if (!newDraft.name.trim() || !newDraft.url.trim()) {
+			return;
+		}
 		await onCreateBookmark(folder?.id ?? null, newDraft);
 		adding = false;
 	}
@@ -80,8 +86,12 @@
 					onclick={(e) => e.stopPropagation()}
 					onkeydown={(e) => {
 						e.stopPropagation();
-						if (e.key === 'Enter') commitRename();
-						if (e.key === 'Escape') renaming = false;
+						if (e.key === 'Enter') {
+							commitRename();
+						}
+						if (e.key === 'Escape') {
+							renaming = false;
+						}
 					}}
 				/>
 				<button

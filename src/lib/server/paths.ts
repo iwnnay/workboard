@@ -1,4 +1,5 @@
 import { resolve, sep } from 'path';
+import { forbidden } from './http';
 
 /**
  * Resolve `filePath` against `root` and guarantee the result stays inside
@@ -10,7 +11,7 @@ export function resolveSafePath(root: string, filePath: string): string {
 	const resolvedRoot = resolve(root);
 	const absolutePath = resolve(resolvedRoot, filePath);
 	if (absolutePath !== resolvedRoot && !absolutePath.startsWith(resolvedRoot + sep)) {
-		throw new Error(
+		throw forbidden(
 			`resolving path "${filePath}" against project root "${resolvedRoot}": ` +
 				`it resolves to "${absolutePath}", which is outside the project root`
 		);

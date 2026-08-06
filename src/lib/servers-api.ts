@@ -1,3 +1,4 @@
+import { api, query } from './api';
 import type {
 	DirectoryListing,
 	ManagedServerDraft,
@@ -6,65 +7,27 @@ import type {
 	ServerStatus
 } from './types';
 
-/**
- * Like `$lib/api`, but surfaces the server's error message instead of the bare
- * status text — starting a server fails for reasons the user needs to read
- * (missing `uv`, port in use, Docker daemon down).
- */
-async function requestJson<T>(url: string, init?: RequestInit): Promise<T> {
-	const response = await fetch(url, {
-		...init,
-		headers: { 'Content-Type': 'application/json', ...init?.headers }
-	});
-
-	if (!response.ok) {
-		let message = `${init?.method ?? 'GET'} ${url} → ${response.status} ${response.statusText}`;
-		try {
-			const body = await response.json();
-			if (body && typeof body.message === 'string' && body.message) message = body.message;
-		} catch {
-			// Non-JSON error body — the status line above stays as the message.
-		}
-		throw new Error(message);
-	}
-
-	return response.json();
-}
-
 export const serversApi = {
-	list: () => requestJson<ManagedServerWithStatus[]>('/api/servers'),
+	list: () => api.get<ManagedServerWithStatus[]>('/api/servers'),
 
-	create: (draft: ManagedServerDraft) =>
-		requestJson<ManagedServerWithStatus>('/api/servers', {
-			method: 'POST',
-			body: JSON.stringify(draft)
-		}),
+	create: (draft: ManagedServerDraft) => api.post<ManagedServerWithStatus>('/api/servers', draft),
 
 	update: (id: string, draft: ManagedServerDraft) =>
-		requestJson<ManagedServerWithStatus>(`/api/servers/${id}`, {
-			method: 'PATCH',
-			body: JSON.stringify(draft)
-		}),
+		api.patch<ManagedServerWithStatus>(`/api/servers/${id}`, draft),
 
-	remove: (id: string) =>
-		requestJson<{ success: boolean; status: ServerStatus }>(`/api/servers/${id}`, {
-			method: 'DELETE'
-		}),
+	remove: (id: string) => api.del<{ success: boolean; status: ServerStatus }>(`/api/servers/${id}`),
 
-	status: (id: string) => requestJson<ServerStatus>(`/api/servers/${id}/status`),
+	status: (id: string) => api.get<ServerStatus>(`/api/servers/${id}/status`),
 
-	start: (id: string) => requestJson<ServerStatus>(`/api/servers/${id}/start`, { method: 'POST' }),
+	start: (id: string) => api.post<ServerStatus>(`/api/servers/${id}/start`),
 
-	stop: (id: string) => requestJson<ServerStatus>(`/api/servers/${id}/stop`, { method: 'POST' }),
+	stop: (id: string) => api.post<ServerStatus>(`/api/servers/${id}/stop`),
 
-	restart: (id: string) =>
-		requestJson<ServerStatus>(`/api/servers/${id}/restart`, { method: 'POST' }),
+	restart: (id: string) => api.post<ServerStatus>(`/api/servers/${id}/restart`),
 
 	detect: (directory: string) =>
-		requestJson<ServerDetection>(`/api/servers/detect?directory=${encodeURIComponent(directory)}`),
+		api.get<ServerDetection>(`/api/servers/detect${query({ directory })}`),
 
 	browse: (path?: string | null) =>
-		requestJson<DirectoryListing>(
-			path ? `/api/servers/browse?path=${encodeURIComponent(path)}` : '/api/servers/browse'
-		)
+		api.get<DirectoryListing>(`/api/servers/browse${query({ path })}`)
 };

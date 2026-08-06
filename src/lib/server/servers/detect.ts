@@ -77,7 +77,9 @@ export function parseEnvPort(content: string): number | null {
 	const match = /^[ \t]*(?:export[ \t]+)?PORT[ \t]*=[ \t]*["']?(\d{1,5})["']?[ \t]*(?:#.*)?$/m.exec(
 		content
 	);
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 	const port = Number(match[1]);
 	return isValidPort(port) ? port : null;
 }
@@ -90,9 +92,13 @@ export function parseEnvPort(content: string): number | null {
  */
 export function parseViteServerPort(content: string): number | null {
 	const serverBlock = /\bserver\s*:\s*\{([\s\S]*?)\}/.exec(content);
-	if (!serverBlock) return null;
+	if (!serverBlock) {
+		return null;
+	}
 	const match = /\bport\s*:\s*(\d{1,5})\b/.exec(serverBlock[1]);
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 	const port = Number(match[1]);
 	return isValidPort(port) ? port : null;
 }
@@ -105,10 +111,14 @@ export function parseDevScriptPort(packageJsonContent: string): number | null {
 	} catch {
 		return null;
 	}
-	if (typeof devScript !== 'string') return null;
+	if (typeof devScript !== 'string') {
+		return null;
+	}
 
 	const match = /--port[= ]\s*["']?(\d{1,5})/.exec(devScript);
-	if (!match) return null;
+	if (!match) {
+		return null;
+	}
 	const port = Number(match[1]);
 	return isValidPort(port) ? port : null;
 }
@@ -123,22 +133,32 @@ export async function detectPort(
 ): Promise<{ port: number | null; portSource: string | null }> {
 	for (const envFile of ENV_FILES) {
 		const content = await readFileOrNull(join(directory, envFile));
-		if (content === null) continue;
+		if (content === null) {
+			continue;
+		}
 		const port = parseEnvPort(content);
-		if (port !== null) return { port, portSource: `${envFile} (PORT)` };
+		if (port !== null) {
+			return { port, portSource: `${envFile} (PORT)` };
+		}
 	}
 
 	for (const viteConfig of VITE_CONFIGS) {
 		const content = await readFileOrNull(join(directory, viteConfig));
-		if (content === null) continue;
+		if (content === null) {
+			continue;
+		}
 		const port = parseViteServerPort(content);
-		if (port !== null) return { port, portSource: `${viteConfig} (server.port)` };
+		if (port !== null) {
+			return { port, portSource: `${viteConfig} (server.port)` };
+		}
 	}
 
 	const packageJson = await readFileOrNull(join(directory, NODE_MARKER));
 	if (packageJson !== null) {
 		const port = parseDevScriptPort(packageJson);
-		if (port !== null) return { port, portSource: 'package.json (dev script --port)' };
+		if (port !== null) {
+			return { port, portSource: 'package.json (dev script --port)' };
+		}
 	}
 
 	return { port: null, portSource: null };
@@ -163,7 +183,9 @@ export async function detectServer(directory: string): Promise<ServerDetection> 
 		markers: []
 	};
 
-	if (!detection.exists) return detection;
+	if (!detection.exists) {
+		return detection;
+	}
 
 	const [hasPython, hasNode] = await Promise.all([
 		fileExists(absolute, PYTHON_MARKER),
@@ -175,7 +197,9 @@ export async function detectServer(directory: string): Promise<ServerDetection> 
 		detection.markers.push(PYTHON_MARKER);
 	}
 	if (hasNode) {
-		if (detection.serverType === null) detection.serverType = 'node';
+		if (detection.serverType === null) {
+			detection.serverType = 'node';
+		}
 		detection.markers.push(NODE_MARKER);
 	}
 
@@ -194,7 +218,9 @@ export async function detectServer(directory: string): Promise<ServerDetection> 
 	const { port, portSource } = await detectPort(absolute);
 	detection.port = port;
 	detection.portSource = portSource;
-	if (portSource) detection.markers.push(portSource);
+	if (portSource) {
+		detection.markers.push(portSource);
+	}
 
 	return detection;
 }
@@ -229,7 +255,9 @@ export async function listDirectories(path: string): Promise<DirectoryListing> {
 	const entries: DirectoryEntry[] = [];
 	for (const name of candidates) {
 		const childPath = join(absolute, name);
-		if (!(await isDirectory(childPath))) continue;
+		if (!(await isDirectory(childPath))) {
+			continue;
+		}
 		entries.push({ name, path: childPath, isProject: await looksLikeProject(childPath) });
 	}
 

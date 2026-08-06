@@ -51,14 +51,18 @@
 		const releasedOnBackdrop = event.target === event.currentTarget;
 		const shouldClose = pressStartedOnBackdrop && releasedOnBackdrop;
 		pressStartedOnBackdrop = false;
-		if (shouldClose) onClose();
+		if (shouldClose) {
+			onClose();
+		}
 	}
 
 	const isEditing = $derived(server !== null);
 
 	const draftPort = $derived.by(() => {
 		const trimmed = portText.trim();
-		if (trimmed === '') return null;
+		if (trimmed === '') {
+			return null;
+		}
 		const port = Number(trimmed);
 		return isValidPort(port) ? port : null;
 	});
@@ -81,11 +85,17 @@
 				return;
 			}
 
-			if (!alias || !isEditing) alias = detection.alias;
-			if (detection.serverType && !isEditing) serverType = detection.serverType;
+			if (!alias || !isEditing) {
+				alias = detection.alias;
+			}
+			if (detection.serverType && !isEditing) {
+				serverType = detection.serverType;
+			}
 			if (detection.docker) {
 				docker = true;
-				if (!dockerCommand) dockerCommand = detection.dockerCommand;
+				if (!dockerCommand) {
+					dockerCommand = detection.dockerCommand;
+				}
 			}
 
 			portSource = detection.portSource;
@@ -130,8 +140,11 @@
 		errorMessage = '';
 		try {
 			const draft = buildDraft(draftPort);
-			if (server) await serversApi.update(server.id, draft);
-			else await serversApi.create(draft);
+			if (server) {
+				await serversApi.update(server.id, draft);
+			} else {
+				await serversApi.create(draft);
+			}
 			onSaved();
 		} catch (caught) {
 			errorMessage = caught instanceof Error ? caught.message : String(caught);
@@ -141,13 +154,17 @@
 	}
 
 	async function remove() {
-		if (!server) return;
+		if (!server) {
+			return;
+		}
 
 		const confirmed = confirm(
 			`Stop "${server.alias}" and remove it from the launcher?\n\n` +
 				`Its server process${server.docker ? ' and Docker resources' : ''} will be shut down first.`
 		);
-		if (!confirmed) return;
+		if (!confirmed) {
+			return;
+		}
 
 		removing = true;
 		errorMessage = '';

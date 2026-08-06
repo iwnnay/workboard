@@ -1,12 +1,5 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { failWith } from '$lib/server/servers/http';
+import { route } from '$lib/server/http';
 import { restartServer } from '$lib/server/servers/service';
 
-export const POST: RequestHandler = async ({ params }) => {
-	try {
-		return json(await restartServer(params.id));
-	} catch (caught) {
-		failWith(`restarting managed server ${params.id}`, caught);
-	}
-};
+export const POST: RequestHandler = ({ params }) => route(() => restartServer(params.id));

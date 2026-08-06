@@ -42,6 +42,7 @@
 		"globals": "^17.4.0",
 		"playwright": "^1.59.1",
 		"prettier": "^3.8.1",
+		"prettier-plugin-curly": "^0.4.1",
 		"prettier-plugin-svelte": "^3.5.1",
 		"svelte": "^5.55.2",
 		"svelte-check": "^4.4.6",

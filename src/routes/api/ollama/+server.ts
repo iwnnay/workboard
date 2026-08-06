@@ -46,7 +46,9 @@ export interface OllamaInfo {
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
 	const res = await fetch(url, init);
-	if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+	if (!res.ok) {
+		throw new Error(`${res.status} ${res.statusText}`);
+	}
 	return (await res.json()) as T;
 }
 
@@ -76,8 +78,12 @@ export const GET: RequestHandler = async ({ url }) => {
 		getJson<{ models: OllamaModel[] }>(`${host}/api/ps`)
 	]);
 
-	if (tags.status === 'fulfilled') info.models = tags.value.models ?? [];
-	if (ps.status === 'fulfilled') info.running = ps.value.models ?? [];
+	if (tags.status === 'fulfilled') {
+		info.models = tags.value.models ?? [];
+	}
+	if (ps.status === 'fulfilled') {
+		info.running = ps.value.models ?? [];
+	}
 
 	// Detailed metadata for every local model, fetched concurrently.
 	const shows = await Promise.allSettled(

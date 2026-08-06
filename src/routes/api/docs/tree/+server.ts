@@ -85,7 +85,9 @@ export const GET: RequestHandler = async ({ url }) => {
 
 	if (projectId) {
 		const rows = await db.select().from(project).where(eq(project.id, projectId));
-		if (rows[0]) root = rows[0].path;
+		if (rows[0]) {
+			root = rows[0].path;
+		}
 	}
 
 	const tree = walk(root, '', 0);
@@ -93,7 +95,9 @@ export const GET: RequestHandler = async ({ url }) => {
 };
 
 function walk(root: string, rel: string, depth: number): TreeNode[] {
-	if (depth > 12) return [];
+	if (depth > 12) {
+		return [];
+	}
 	const abs = rel ? join(root, rel) : root;
 	let entries: string[];
 	try {
@@ -106,8 +110,12 @@ function walk(root: string, rel: string, depth: number): TreeNode[] {
 	const files: TreeNode[] = [];
 
 	for (const name of entries.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))) {
-		if (name.startsWith('.') && !name.startsWith('.env') && name !== '.gitignore') continue;
-		if (IGNORE.has(name)) continue;
+		if (name.startsWith('.') && !name.startsWith('.env') && name !== '.gitignore') {
+			continue;
+		}
+		if (IGNORE.has(name)) {
+			continue;
+		}
 
 		const relPath = rel ? `${rel}/${name}` : name;
 		const fullPath = join(root, relPath);
@@ -123,7 +131,9 @@ function walk(root: string, rel: string, depth: number): TreeNode[] {
 		} else {
 			const dot = name.lastIndexOf('.');
 			const ext = dot > 0 ? name.slice(dot) : '';
-			if (ext && !CODE_EXTS.has(ext)) continue;
+			if (ext && !CODE_EXTS.has(ext)) {
+				continue;
+			}
 			files.push({ name, path: relPath, type: 'file', ext: ext || undefined });
 		}
 	}

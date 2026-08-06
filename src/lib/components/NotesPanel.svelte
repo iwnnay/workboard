@@ -19,7 +19,9 @@
 						const ids: string[] = JSON.parse(saved);
 						return ids.filter((id) => initialNotes.some((n) => n.id === id));
 					}
-				} catch {}
+				} catch {
+					// A malformed list of open notes just opens none.
+				}
 				return [];
 			})()
 		: [];
@@ -32,7 +34,9 @@
 		restoredIds.reduce(
 			(acc, id) => {
 				const note = initialNotes.find((n) => n.id === id);
-				if (!note) return acc;
+				if (!note) {
+					return acc;
+				}
 				try {
 					const stored = browser ? localStorage.getItem(`draft_${id}`) : null;
 					acc[id] = stored ? JSON.parse(stored) : { title: note.title, content: note.content };
@@ -64,13 +68,17 @@
 	);
 
 	$effect(() => {
-		if (showPopup) setTimeout(() => searchInputEl?.focus(), 0);
+		if (showPopup) {
+			setTimeout(() => searchInputEl?.focus(), 0);
+		}
 	});
 
 	// Persist open note IDs on every change (safe: first run re-writes the
 	// same value we just loaded, so nothing is lost).
 	$effect(() => {
-		if (browser) localStorage.setItem('openNoteIds', JSON.stringify(openNoteIds));
+		if (browser) {
+			localStorage.setItem('openNoteIds', JSON.stringify(openNoteIds));
+		}
 	});
 
 	onDestroy(() => {
@@ -89,9 +97,13 @@
 
 	function openNote(id: string) {
 		if (!openNoteIds.includes(id)) {
-			if (openNoteIds.length >= 8) return;
+			if (openNoteIds.length >= 8) {
+				return;
+			}
 			const note = notes.find((n) => n.id === id);
-			if (!note) return;
+			if (!note) {
+				return;
+			}
 			openNoteIds = [...openNoteIds, id];
 			try {
 				const stored = localStorage.getItem(`draft_${id}`);
@@ -106,16 +118,23 @@
 		showPopup = false;
 	}
 
+	function withoutKey<T>(record: Record<string, T>, key: string): Record<string, T> {
+		const rest = { ...record };
+		delete rest[key];
+		return rest;
+	}
+
 	async function closeNote(id: string) {
 		await saveToDb(id);
 		openNoteIds = openNoteIds.filter((nid) => nid !== id);
-		const { [id]: _, ...rest } = drafts;
-		drafts = rest;
+		drafts = withoutKey(drafts, id);
 	}
 
 	async function saveToDb(id: string) {
 		const draft = drafts[id];
-		if (!draft) return;
+		if (!draft) {
+			return;
+		}
 		const res = await fetch(`/api/notes/${id}`, {
 			method: 'PATCH',
 			headers: { 'Content-Type': 'application/json' },
@@ -158,8 +177,7 @@
 		notes = notes.filter((n) => n.id !== id);
 		if (openNoteIds.includes(id)) {
 			openNoteIds = openNoteIds.filter((nid) => nid !== id);
-			const { [id]: _, ...rest } = drafts;
-			drafts = rest;
+			drafts = withoutKey(drafts, id);
 		}
 	}
 
@@ -170,7 +188,9 @@
 
 <svelte:document
 	onvisibilitychange={() => {
-		if (document.visibilityState === 'hidden') saveAll();
+		if (document.visibilityState === 'hidden') {
+			saveAll();
+		}
 	}}
 />
 
@@ -181,7 +201,9 @@
 		tabindex="-1"
 		onclick={() => (showPopup = false)}
 		onkeydown={(e) => {
-			if (e.key === 'Escape') showPopup = false;
+			if (e.key === 'Escape') {
+				showPopup = false;
+			}
 		}}
 	></div>
 	<div
@@ -198,7 +220,9 @@
 				class="popup-search"
 				placeholder="Search notes..."
 				onkeydown={(e) => {
-					if (e.key === 'Escape') showPopup = false;
+					if (e.key === 'Escape') {
+						showPopup = false;
+					}
 				}}
 			/>
 		</div>
