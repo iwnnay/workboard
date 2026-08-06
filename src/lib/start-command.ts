@@ -1,4 +1,3 @@
-
 import type { ServerType } from './types';
 
 export const DEFAULT_DOCKER_COMMAND = 'docker compose up -d';

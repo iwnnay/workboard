@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
 	buildStartCommand,
-	buildStartEnvironment,
 	describeStartCommand,
 	deriveDockerStopCommand,
 	isServerType,
@@ -20,12 +19,6 @@ describe('buildStartCommand', () => {
 
 	it('rejects an unknown server type', () => {
 		expect(() => buildStartCommand('ruby' as 'node')).toThrow(/unknown server type/);
-	});
-});
-
-describe('buildStartEnvironment', () => {
-	it('gives a server its port via PORT', () => {
-		expect(buildStartEnvironment(8000)).toEqual({ PORT: '8000' });
 	});
 });
 

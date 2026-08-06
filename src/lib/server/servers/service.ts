@@ -11,7 +11,6 @@ import type {
 } from '$lib/types';
 import {
 	buildStartCommand,
-	buildStartEnvironment,
 	deriveDockerStopCommand,
 	isServerType,
 	parsePort,
@@ -211,8 +210,9 @@ export async function startServer(id: string): Promise<ServerStatus> {
 
 	const logPath = logPathFor(id);
 	const command = buildStartCommand(server.serverType);
-	const environment = buildStartEnvironment(server.port);
-	const pid = await spawnBackgroundCommand(command, server.directory, logPath, environment);
+	const pid = await spawnBackgroundCommand(command, server.directory, logPath, {
+		PORT: String(server.port)
+	});
 	const startedAt = new Date().toISOString();
 
 	await db.update(managedServer).set({ pid, startedAt, logPath }).where(eq(managedServer.id, id));

@@ -23,6 +23,12 @@
 	let message = $state('');
 	let committing = $state(false);
 	let commitError = $state('');
+	let pushAfterCommit = $state(false);
+
+	// Set when the commit landed but the push didn't, so the dialog stops offering
+	// to commit again — the message is already in a commit.
+	let committed = $state(false);
+	let pushError = $state('');
 
 	let messageBox = $state<HTMLTextAreaElement | null>(null);
 
@@ -50,15 +56,25 @@
 		messageBox?.focus();
 	});
 
+	const pushErrorText = $derived(
+		pushError ? `The commit succeeded. The push did not:\n${pushError}` : ''
+	);
+
+	const commitLabel = $derived.by(() => {
+		if (committing) return pushAfterCommit ? 'Committing & pushing…' : 'Committing…';
+		return pushAfterCommit ? 'Commit & push' : 'Commit';
+	});
+
 	async function commit() {
-		if (committing || !message.trim()) return;
+		if (committing || committed || !message.trim()) return;
 		committing = true;
 		commitError = '';
+		pushError = '';
 		try {
 			const response = await fetch('/api/diff/commit', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ projectId, message })
+				body: JSON.stringify({ projectId, message, push: pushAfterCommit })
 			});
 			const payload = await response.json();
 			if (!response.ok) {
@@ -66,7 +82,15 @@
 					payload.error ?? `committing changes: request failed with status ${response.status}`
 				);
 			}
+
+			// The commit is in either way, so the diff view is refreshed either way.
 			onCommitted();
+
+			if (payload.pushError) {
+				committed = true;
+				pushError = payload.pushError;
+				return;
+			}
 			onClose();
 		} catch (caught) {
 			commitError = (caught as Error).message;
@@ -131,7 +155,7 @@
 				placeholder="What changed and why…"
 				rows="4"
 				spellcheck="true"
-				disabled={committing}
+				disabled={committing || committed}
 			></textarea>
 		</div>
 
@@ -139,11 +163,25 @@
 			<div class="commit-error">{commitError}</div>
 		{/if}
 
+		{#if pushErrorText}
+			<div class="commit-error">{pushErrorText}</div>
+		{/if}
+
 		<footer class="modal-foot">
+			<label class="push-flag">
+				<input type="checkbox" bind:checked={pushAfterCommit} disabled={committing || committed} />
+				<span>Push after commit</span>
+			</label>
 			<span class="hint">Commits staged changes · Ctrl+Enter</span>
-			<button class="cancel-btn" disabled={committing} onclick={onClose}>Cancel</button>
-			<button class="commit-btn" disabled={committing || !message.trim()} onclick={commit}>
-				{committing ? 'Committing…' : 'Commit'}
+			<button class="cancel-btn" disabled={committing} onclick={onClose}>
+				{committed ? 'Close' : 'Cancel'}
+			</button>
+			<button
+				class="commit-btn"
+				disabled={committing || committed || !message.trim()}
+				onclick={commit}
+			>
+				{commitLabel}
 			</button>
 		</footer>
 	</div>
@@ -317,6 +355,21 @@
 		padding: 0.75rem 1rem;
 		border-top: 1px solid var(--border);
 		flex-shrink: 0;
+	}
+
+	.push-flag {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		font-size: 0.75rem;
+		color: var(--text-dim);
+		cursor: pointer;
+		flex-shrink: 0;
+	}
+
+	.push-flag:has(input:disabled) {
+		opacity: 0.5;
+		cursor: default;
 	}
 
 	.hint {
