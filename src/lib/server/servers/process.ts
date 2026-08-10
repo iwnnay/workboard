@@ -3,6 +3,7 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { closeSync, openSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
+import { buildChildEnvironment, readOwnConfigKeys } from './env';
 
 const execAsync = promisify(exec);
 const LOG_DIR = resolve(process.cwd(), 'logs', 'servers');
@@ -71,6 +72,12 @@ export async function spawnBackgroundCommand(
 ): Promise<number> {
 	await mkdir(dirname(logPath), { recursive: true });
 
+	const childEnvironment = buildChildEnvironment(
+		process.env,
+		await readOwnConfigKeys(process.cwd()),
+		extraEnvironment
+	);
+
 	const logFd = openSync(logPath, 'a');
 	try {
 		const child = spawn(command, {
@@ -79,7 +86,7 @@ export async function spawnBackgroundCommand(
 			windowsHide: true,
 			detached: true,
 			stdio: ['ignore', logFd, logFd],
-			env: { ...process.env, ...extraEnvironment }
+			env: childEnvironment
 		});
 
 		child.on('error', () => {});
