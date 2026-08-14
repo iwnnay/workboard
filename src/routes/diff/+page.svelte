@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import type { DiffFile, DiffLine } from '$lib/server/git';
 	import type { Project } from '$lib/types';
-	import { untrack, onMount } from 'svelte';
+	import { untrack, onMount, tick } from 'svelte';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { goto, invalidate } from '$app/navigation';
 	import FileEditor from '$lib/components/FileEditor.svelte';
@@ -10,6 +10,11 @@
 	import { diffApi } from '$lib/diff-api';
 
 	let { data }: { data: PageData } = $props();
+
+	const FILE_LIST_WIDTH_KEY = 'diff_file_list_width';
+	const DEFAULT_FILE_LIST_WIDTH = 240;
+	const MIN_FILE_LIST_WIDTH = 150;
+	const MAX_FILE_LIST_WIDTH = 720;
 
 	// Mutable local mirrors of server state
 	let projects = $state<Project[]>(untrack(() => data.projects));
@@ -25,6 +30,9 @@
 	let filterQuery = $state('');
 	let _selectedPath = $state<string | null>(null);
 	let reviewed = new SvelteSet<string>();
+	let stagedPaths = new SvelteSet<string>();
+	let fileListWidth = $state(DEFAULT_FILE_LIST_WIDTH);
+	let resizeOrigin = $state<{ x: number; width: number } | null>(null);
 
 	// Diff view features
 	let sideBySide = $state(false);
@@ -33,6 +41,8 @@
 	let highlightWord = $state('');
 	let copyRef = $state<{ x: number; y: number; ref: string } | null>(null);
 	let expandedGaps = new SvelteMap<string, string[]>();
+	let fileLineTotals = new SvelteMap<string, number>();
+	let diffTableRoot = $state<HTMLElement | null>(null);
 
 	// ── Derived ──────────────────────────────────────────────
 
@@ -40,17 +50,28 @@
 		selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null
 	);
 
+	const orderedFiles = $derived(
+		[...data.files].sort((first, second) => first.path.localeCompare(second.path))
+	);
+
 	const selectedPath = $derived(
 		_selectedPath && data.files.find((f) => f.path === _selectedPath)
 			? _selectedPath
-			: (data.files[0]?.path ?? null)
+			: (orderedFiles[0]?.path ?? null)
 	);
 
 	const filteredFiles = $derived(
 		filterQuery.trim()
-			? data.files.filter((f) => f.path.toLowerCase().includes(filterQuery.toLowerCase()))
-			: data.files
+			? orderedFiles.filter((f) => f.path.toLowerCase().includes(filterQuery.toLowerCase()))
+			: orderedFiles
 	);
+
+	function isStagedFile(file: DiffFile): boolean {
+		return file.isStaged || stagedPaths.has(file.path);
+	}
+
+	const unstagedFiles = $derived(filteredFiles.filter((file) => !isStagedFile(file)));
+	const stagedFiles = $derived(filteredFiles.filter((file) => isStagedFile(file)));
 
 	const activeFile = $derived<DiffFile | null>(
 		data.files.find((f) => f.path === selectedPath) ?? null
@@ -67,7 +88,56 @@
 			}
 		}
 		expandedGaps.clear();
+
+		const savedWidth = parseInt(localStorage.getItem(FILE_LIST_WIDTH_KEY) ?? '');
+		if (!isNaN(savedWidth)) {
+			fileListWidth = clampFileListWidth(savedWidth);
+		}
 	});
+
+	// ── File list width ──────────────────────────────────────
+
+	function clampFileListWidth(width: number): number {
+		return Math.min(MAX_FILE_LIST_WIDTH, Math.max(MIN_FILE_LIST_WIDTH, Math.round(width)));
+	}
+
+	function persistFileListWidth() {
+		localStorage.setItem(FILE_LIST_WIDTH_KEY, String(fileListWidth));
+	}
+
+	function startResize(event: PointerEvent) {
+		(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+		resizeOrigin = { x: event.clientX, width: fileListWidth };
+	}
+
+	function trackResize(event: PointerEvent) {
+		if (!resizeOrigin) {
+			return;
+		}
+		fileListWidth = clampFileListWidth(resizeOrigin.width + event.clientX - resizeOrigin.x);
+	}
+
+	function endResize(event: PointerEvent) {
+		if (!resizeOrigin) {
+			return;
+		}
+		(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+		resizeOrigin = null;
+		persistFileListWidth();
+	}
+
+	function resizeWithKeys(event: KeyboardEvent) {
+		const step = event.shiftKey ? 40 : 10;
+		if (event.key === 'ArrowLeft') {
+			fileListWidth = clampFileListWidth(fileListWidth - step);
+		} else if (event.key === 'ArrowRight') {
+			fileListWidth = clampFileListWidth(fileListWidth + step);
+		} else {
+			return;
+		}
+		event.preventDefault();
+		persistFileListWidth();
+	}
 
 	// ── Reviewed persistence ─────────────────────────────────
 
@@ -127,6 +197,9 @@
 		const currentFiles = data.files;
 		const storageKey = reviewedStorageKey(data.projectId);
 		untrack(() => {
+			expandedGaps.clear();
+			fileLineTotals.clear();
+			stagedPaths.clear();
 			reviewed.clear();
 			const storedFingerprints = readStoredFingerprints(storageKey);
 			for (const file of currentFiles) {
@@ -302,35 +375,102 @@
 
 	// ── Pull-in-lines (expand context gaps) ──────────────────
 
-	type Gap = { newStart: number; newEnd: number; count: number };
+	type Gap = {
+		newStart: number;
+		newEnd: number;
+		oldStart: number;
+		count: number;
+		direction: 'up' | 'down' | 'both';
+	};
+
+	function lastLineNumber(lines: DiffLine[], side: 'oldNum' | 'newNum'): number | null {
+		for (let index = lines.length - 1; index >= 0; index--) {
+			const number = lines[index][side];
+			if (number !== null) {
+				return number;
+			}
+		}
+		return null;
+	}
 
 	function getGapBefore(file: DiffFile, hunkIdx: number): Gap | null {
-		if (hunkIdx === 0) {
-			return null;
-		}
-		const prev = file.hunks[hunkIdx - 1];
 		const curr = file.hunks[hunkIdx];
-		const lastNew = [...prev.lines].reverse().find((l) => l.newNum !== null)?.newNum;
-		const firstNew = curr.lines.find((l) => l.newNum !== null)?.newNum;
-		if (lastNew == null || firstNew == null || firstNew <= lastNew + 1) {
+		const firstNew = curr.lines.find((line) => line.newNum !== null)?.newNum;
+		const firstOld = curr.lines.find((line) => line.oldNum !== null)?.oldNum;
+		if (firstNew == null) {
 			return null;
 		}
-		return { newStart: lastNew + 1, newEnd: firstNew - 1, count: firstNew - lastNew - 1 };
+
+		if (hunkIdx === 0) {
+			if (firstNew <= 1) {
+				return null;
+			}
+			return {
+				newStart: 1,
+				newEnd: firstNew - 1,
+				oldStart: firstOld == null ? 1 : Math.max(1, firstOld - firstNew + 1),
+				count: firstNew - 1,
+				direction: 'up'
+			};
+		}
+
+		const prev = file.hunks[hunkIdx - 1];
+		const lastNew = lastLineNumber(prev.lines, 'newNum');
+		const lastOld = lastLineNumber(prev.lines, 'oldNum');
+		if (lastNew == null || firstNew <= lastNew + 1) {
+			return null;
+		}
+		return {
+			newStart: lastNew + 1,
+			newEnd: firstNew - 1,
+			oldStart: (lastOld ?? lastNew) + 1,
+			count: firstNew - lastNew - 1,
+			direction: 'both'
+		};
 	}
 
-	function gapKey(filePath: string, hunkIdx: number): string {
-		return `${filePath}:${hunkIdx}`;
+	function getGapAfter(file: DiffFile, totalLines: number | undefined): Gap | null {
+		const lastHunk = file.hunks.at(-1);
+		if (!lastHunk || totalLines == null) {
+			return null;
+		}
+		const lastNew = lastLineNumber(lastHunk.lines, 'newNum');
+		const lastOld = lastLineNumber(lastHunk.lines, 'oldNum');
+		if (lastNew == null || totalLines <= lastNew) {
+			return null;
+		}
+		return {
+			newStart: lastNew + 1,
+			newEnd: totalLines,
+			oldStart: (lastOld ?? lastNew) + 1,
+			count: totalLines - lastNew,
+			direction: 'down'
+		};
 	}
 
-	async function expandGap(file: DiffFile, hunkIdx: number, gap: Gap) {
-		const key = gapKey(file.path, hunkIdx);
-		if (expandedGaps.has(key)) {
+	function gapKey(filePath: string, position: number | 'end'): string {
+		return `${filePath}:${position}`;
+	}
+
+	function gapLabel(gap: Gap): string {
+		const lines = `${gap.count} ${gap.count === 1 ? 'line' : 'lines'}`;
+		if (gap.direction === 'up') {
+			return `↑ ${lines} to start of file`;
+		}
+		if (gap.direction === 'down') {
+			return `↓ ${lines} to end of file`;
+		}
+		return `↕ ${lines}`;
+	}
+
+	async function expandGap(gap: Gap, key: string) {
+		if (!activeFile || expandedGaps.has(key)) {
 			return;
 		}
 		try {
 			const { lines } = await diffApi.lines(
-				selectedProjectId,
-				file.path,
+				data.projectId,
+				activeFile.path,
 				data.range,
 				gap.newStart,
 				gap.newEnd
@@ -340,6 +480,38 @@
 			// The gap simply stays collapsed.
 		}
 	}
+
+	$effect(() => {
+		const file = activeFile;
+		if (!file || file.isBinary || file.isDeleted || file.hunks.length === 0) {
+			return;
+		}
+		if (fileLineTotals.has(file.path)) {
+			return;
+		}
+		const path = file.path;
+		const projectId = data.projectId;
+		const range = data.range;
+		let cancelled = false;
+		void (async () => {
+			const total = await diffApi
+				.lines(projectId, path, range, 1, 0)
+				.then((result) => result.total)
+				.catch(() => null);
+			if (total !== null && !cancelled) {
+				fileLineTotals.set(path, total);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	});
+
+	const trailingGap = $derived(
+		activeFile && !activeFile.isBinary
+			? getGapAfter(activeFile, fileLineTotals.get(activeFile.path))
+			: null
+	);
 
 	// ── Copy file:line reference ──────────────────────────────
 
@@ -355,6 +527,68 @@
 		return isNaN(n) ? null : n;
 	}
 
+	function characterOffsetWithin(root: Node, container: Node, offset: number): number | null {
+		if (!root.contains(container)) {
+			return null;
+		}
+		const range = document.createRange();
+		range.selectNodeContents(root);
+		try {
+			range.setEnd(container, offset);
+		} catch {
+			return null;
+		}
+		return range.toString().length;
+	}
+
+	function textBoundaryAt(root: Node, target: number): { node: Text; offset: number } | null {
+		const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+		let consumed = 0;
+		let lastNode: Text | null = null;
+		while (walker.nextNode()) {
+			const textNode = walker.currentNode as Text;
+			if (consumed + textNode.data.length >= target) {
+				return { node: textNode, offset: target - consumed };
+			}
+			consumed += textNode.data.length;
+			lastNode = textNode;
+		}
+		return lastNode ? { node: lastNode, offset: lastNode.data.length } : null;
+	}
+
+	async function restoreSelection(root: Node, startOffset: number, endOffset: number) {
+		await tick();
+		const start = textBoundaryAt(root, startOffset);
+		const end = textBoundaryAt(root, endOffset);
+		const selection = window.getSelection();
+		if (!start || !end || !selection) {
+			return;
+		}
+		const range = document.createRange();
+		range.setStart(start.node, start.offset);
+		range.setEnd(end.node, end.offset);
+		selection.removeAllRanges();
+		selection.addRange(range);
+	}
+
+	function applyHighlight(word: string, selection: Selection) {
+		if (word === highlightWord) {
+			return;
+		}
+		const root = diffTableRoot;
+		const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+		if (!root || !range) {
+			highlightWord = word;
+			return;
+		}
+		const startOffset = characterOffsetWithin(root, range.startContainer, range.startOffset);
+		const endOffset = characterOffsetWithin(root, range.endContainer, range.endOffset);
+		highlightWord = word;
+		if (startOffset !== null && endOffset !== null) {
+			void restoreSelection(root, startOffset, endOffset);
+		}
+	}
+
 	function handleDiffMouseUp(e: MouseEvent) {
 		if (editing) {
 			return;
@@ -362,14 +596,14 @@
 		const sel = window.getSelection();
 		const text = sel?.toString().trim() ?? '';
 
-		if (!text) {
+		if (!text || !sel) {
 			highlightWord = '';
 			copyRef = null;
 			return;
 		}
 
 		if (text.length >= 2 && !text.includes('\n')) {
-			highlightWord = text;
+			applyHighlight(text, sel);
 		}
 
 		if (!activeFile || !sel) {
@@ -450,6 +684,7 @@
 		stageError = '';
 		try {
 			await diffApi.stage(data.projectId, stagedPath);
+			stagedPaths.add(stagedPath);
 			stageState = 'staged';
 			stageResetTimer = setTimeout(resetStageState, 1500);
 		} catch (caught) {
@@ -480,6 +715,9 @@
 		stageAllError = '';
 		try {
 			await diffApi.stageAll(data.projectId);
+			for (const file of data.files) {
+				stagedPaths.add(file.path);
+			}
 			stageAllState = 'staged';
 			stageAllResetTimer = setTimeout(resetStageAllState, 1500);
 		} catch (caught) {
@@ -525,6 +763,103 @@
 		<button class="copy-ref-btn" onclick={doCopyRef}>{copyRef.ref}</button>
 	</div>
 {/if}
+
+{#snippet fileRow(file: DiffFile)}
+	<div
+		class="file-item"
+		class:active={selectedPath === file.path}
+		class:is-reviewed={reviewed.has(file.path)}
+		role="button"
+		tabindex="0"
+		onclick={() => selectFile(file.path)}
+		onkeydown={(e) => e.key === 'Enter' && selectFile(file.path)}
+		title={file.path}
+	>
+		<span class="file-name">
+			{#if fileDir(file.path)}
+				<span class="file-dir">{fileDir(file.path)}/</span>
+			{/if}
+			{fileLabel(file.path)}
+			{#if file.isUntracked}<span class="badge untracked">U</span>{:else if file.isNew}<span
+					class="badge new">N</span
+				>{/if}
+			{#if file.isDeleted}<span class="badge del">D</span>{/if}
+		</span>
+		<span class="file-stats">
+			{#if file.isBinary}
+				<span class="stat-bin">bin</span>
+			{:else}
+				{#if file.additions > 0}
+					<span class="stat-add">+{file.additions}</span>
+				{/if}
+				{#if file.deletions > 0}
+					<span class="stat-del">-{file.deletions}</span>
+				{/if}
+			{/if}
+		</span>
+		<button
+			class="review-btn"
+			class:done={reviewed.has(file.path)}
+			onclick={(e) => {
+				e.stopPropagation();
+				toggleReviewed(file.path);
+			}}
+			aria-label="Mark as reviewed">✓</button
+		>
+	</div>
+{/snippet}
+
+{#snippet unifiedGapRows(gap: Gap, key: string)}
+	{@const expanded = expandedGaps.get(key)}
+	{#if expanded}
+		{#each expanded as content, index (index)}
+			<tr class="diff-row context">
+				<td class="ln ln-old">{gap.oldStart + index}</td>
+				<td class="ln ln-new">{gap.newStart + index}</td>
+				<td class="diff-sign">&nbsp;</td>
+				<td class="diff-content"
+					>{#each splitContent(content, highlightWord) as part, partIndex (partIndex)}{#if part.hl}<mark
+								class="hl">{part.text}</mark
+							>{:else}{part.text}{/if}{/each}</td
+				>
+			</tr>
+		{/each}
+	{:else}
+		<tr class="gap-row" onclick={() => expandGap(gap, key)}>
+			<td colspan="4" class="gap-cell">
+				<button class="gap-btn">{gapLabel(gap)}</button>
+			</td>
+		</tr>
+	{/if}
+{/snippet}
+
+{#snippet sbsGapRows(gap: Gap, key: string)}
+	{@const expanded = expandedGaps.get(key)}
+	{#if expanded}
+		{#each expanded as content, index (index)}
+			<tr class="diff-row context">
+				<td class="ln ln-old">{gap.oldStart + index}</td>
+				<td class="diff-content sbs-old context"
+					>{#each splitContent(content, highlightWord) as part, partIndex (partIndex)}{#if part.hl}<mark
+								class="hl">{part.text}</mark
+							>{:else}{part.text}{/if}{/each}</td
+				>
+				<td class="ln ln-new">{gap.newStart + index}</td>
+				<td class="diff-content sbs-new context"
+					>{#each splitContent(content, highlightWord) as part, partIndex (partIndex)}{#if part.hl}<mark
+								class="hl">{part.text}</mark
+							>{:else}{part.text}{/if}{/each}</td
+				>
+			</tr>
+		{/each}
+	{:else}
+		<tr class="gap-row" onclick={() => expandGap(gap, key)}>
+			<td colspan="4" class="gap-cell">
+				<button class="gap-btn">{gapLabel(gap)}</button>
+			</td>
+		</tr>
+	{/if}
+{/snippet}
 
 <div class="page">
 	<!-- Top bar -->
@@ -643,9 +978,9 @@
 		{/if}
 	</header>
 
-	<div class="body">
+	<div class="body" class:resizing={resizeOrigin !== null}>
 		<!-- Left: file list -->
-		<aside class="file-list">
+		<aside class="file-list" style="width: {fileListWidth}px">
 			<div class="filter-wrap">
 				<input
 					class="filter-input"
@@ -661,52 +996,46 @@
 				{:else if filteredFiles.length === 0}
 					<p class="list-empty">No files.</p>
 				{:else}
-					{#each filteredFiles as file (file.path)}
-						<div
-							class="file-item"
-							class:active={selectedPath === file.path}
-							class:is-reviewed={reviewed.has(file.path)}
-							role="button"
-							tabindex="0"
-							onclick={() => selectFile(file.path)}
-							onkeydown={(e) => e.key === 'Enter' && selectFile(file.path)}
-							title={file.path}
-						>
-							<span class="file-name">
-								{#if fileDir(file.path)}
-									<span class="file-dir">{fileDir(file.path)}/</span>
-								{/if}
-								{fileLabel(file.path)}
-								{#if file.isUntracked}<span class="badge untracked">U</span
-									>{:else if file.isNew}<span class="badge new">N</span>{/if}
-								{#if file.isDeleted}<span class="badge del">D</span>{/if}
-							</span>
-							<span class="file-stats">
-								{#if file.isBinary}
-									<span class="stat-bin">bin</span>
-								{:else}
-									{#if file.additions > 0}
-										<span class="stat-add">+{file.additions}</span>
-									{/if}
-									{#if file.deletions > 0}
-										<span class="stat-del">-{file.deletions}</span>
-									{/if}
-								{/if}
-							</span>
-							<button
-								class="review-btn"
-								class:done={reviewed.has(file.path)}
-								onclick={(e) => {
-									e.stopPropagation();
-									toggleReviewed(file.path);
-								}}
-								aria-label="Mark as reviewed">✓</button
-							>
+					{#if unstagedFiles.length > 0}
+						{#if stagedFiles.length > 0}
+							<div class="group-label">
+								Not staged <span class="group-count">{unstagedFiles.length}</span>
+							</div>
+						{/if}
+						{#each unstagedFiles as file (file.path)}
+							{@render fileRow(file)}
+						{/each}
+					{/if}
+					{#if stagedFiles.length > 0}
+						<div class="group-label">
+							Staged <span class="group-count">{stagedFiles.length}</span>
 						</div>
-					{/each}
+						{#each stagedFiles as file (file.path)}
+							{@render fileRow(file)}
+						{/each}
+					{/if}
 				{/if}
 			</div>
 		</aside>
+
+		<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+		<div
+			class="resizer"
+			class:dragging={resizeOrigin !== null}
+			role="separator"
+			aria-orientation="vertical"
+			aria-label="Resize file list"
+			aria-valuenow={fileListWidth}
+			aria-valuemin={MIN_FILE_LIST_WIDTH}
+			aria-valuemax={MAX_FILE_LIST_WIDTH}
+			tabindex="0"
+			onpointerdown={startResize}
+			onpointermove={trackResize}
+			onpointerup={endResize}
+			onpointercancel={endResize}
+			onkeydown={resizeWithKeys}
+		></div>
 
 		<!-- Right: diff view -->
 		<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
@@ -799,7 +1128,7 @@
 					{:else if activeFile.hunks.length === 0}
 						<div class="binary-notice">No textual changes</div>
 					{:else}
-						<div class="diff-table-wrap">
+						<div class="diff-table-wrap" bind:this={diffTableRoot}>
 							{#if sideBySide}
 								<!-- Side-by-side view -->
 								<table class="diff-table sbs-table">
@@ -813,32 +1142,7 @@
 										{#each activeFile.hunks as hunk, hunkIdx (hunkIdx)}
 											{@const gap = getGapBefore(activeFile, hunkIdx)}
 											{#if gap}
-												{@const key = gapKey(activeFile.path, hunkIdx)}
-												{@const expanded = expandedGaps.get(key)}
-												{#if expanded}
-													{#each expanded as content, i (i)}
-														<tr class="diff-row context">
-															<td class="ln ln-old">{gap.newStart + i}</td>
-															<td class="diff-content sbs-old context"
-																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
-																			class="hl">{part.text}</mark
-																		>{:else}{part.text}{/if}{/each}</td
-															>
-															<td class="ln ln-new">{gap.newStart + i}</td>
-															<td class="diff-content sbs-new context"
-																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
-																			class="hl">{part.text}</mark
-																		>{:else}{part.text}{/if}{/each}</td
-															>
-														</tr>
-													{/each}
-												{:else}
-													<tr class="gap-row" onclick={() => expandGap(activeFile, hunkIdx, gap)}>
-														<td colspan="4" class="gap-cell">
-															<button class="gap-btn">↕ {gap.count} lines</button>
-														</td>
-													</tr>
-												{/if}
+												{@render sbsGapRows(gap, gapKey(activeFile.path, hunkIdx))}
 											{/if}
 											<tr class="hunk-row">
 												<td class="ln ln-old" colspan="1"></td>
@@ -867,6 +1171,9 @@
 												</tr>
 											{/each}
 										{/each}
+										{#if trailingGap}
+											{@render sbsGapRows(trailingGap, gapKey(activeFile.path, 'end'))}
+										{/if}
 									</tbody>
 								</table>
 							{:else}
@@ -876,28 +1183,7 @@
 										{#each activeFile.hunks as hunk, hunkIdx (hunkIdx)}
 											{@const gap = getGapBefore(activeFile, hunkIdx)}
 											{#if gap}
-												{@const key = gapKey(activeFile.path, hunkIdx)}
-												{@const expanded = expandedGaps.get(key)}
-												{#if expanded}
-													{#each expanded as content, i (i)}
-														<tr class="diff-row context">
-															<td class="ln ln-old">{gap.newStart + i}</td>
-															<td class="ln ln-new">{gap.newStart + i}</td>
-															<td class="diff-sign">&nbsp;</td>
-															<td class="diff-content"
-																>{#each splitContent(content, highlightWord) as part, j (j)}{#if part.hl}<mark
-																			class="hl">{part.text}</mark
-																		>{:else}{part.text}{/if}{/each}</td
-															>
-														</tr>
-													{/each}
-												{:else}
-													<tr class="gap-row" onclick={() => expandGap(activeFile, hunkIdx, gap)}>
-														<td colspan="4" class="gap-cell">
-															<button class="gap-btn">↕ {gap.count} lines</button>
-														</td>
-													</tr>
-												{/if}
+												{@render unifiedGapRows(gap, gapKey(activeFile.path, hunkIdx))}
 											{/if}
 											<tr class="hunk-row">
 												<td class="ln ln-old" colspan="2"></td>
@@ -924,6 +1210,9 @@
 												</tr>
 											{/each}
 										{/each}
+										{#if trailingGap}
+											{@render unifiedGapRows(trailingGap, gapKey(activeFile.path, 'end'))}
+										{/if}
 									</tbody>
 								</table>
 							{/if}
@@ -975,6 +1264,11 @@
 		display: flex;
 		flex: 1;
 		overflow: hidden;
+	}
+
+	.body.resizing {
+		user-select: none;
+		cursor: col-resize;
 	}
 
 	/* ── Project selector ───────────────────────────────────── */
@@ -1234,13 +1528,46 @@
 
 	/* ── File list ──────────────────────────────────────────── */
 	.file-list {
-		width: 240px;
 		flex-shrink: 0;
 		display: flex;
 		flex-direction: column;
 		background: var(--surface);
-		border-right: 1px solid var(--border);
 		overflow: hidden;
+	}
+
+	.resizer {
+		flex-shrink: 0;
+		width: 5px;
+		background: var(--border);
+		cursor: col-resize;
+		touch-action: none;
+		transition: background 0.1s;
+	}
+
+	.resizer:hover,
+	.resizer:focus-visible,
+	.resizer.dragging {
+		background: var(--accent-muted);
+		outline: none;
+	}
+
+	.group-label {
+		display: flex;
+		align-items: center;
+		gap: 0.375rem;
+		padding: 0.5rem 0.75rem 0.25rem;
+		font-size: 0.6875rem;
+		font-weight: 600;
+		text-transform: uppercase;
+		letter-spacing: 0.08em;
+		color: var(--text-ghost);
+	}
+
+	.group-count {
+		font-size: 0.6875rem;
+		font-weight: 600;
+		letter-spacing: 0;
+		color: var(--text-faint);
 	}
 
 	.filter-wrap {
@@ -1327,7 +1654,7 @@
 	}
 
 	.review-btn.done {
-		color: #4ade80;
+		color: var(--diff-add-strong);
 		opacity: 1;
 	}
 
@@ -1453,7 +1780,7 @@
 	}
 
 	.copy-path-btn.copied {
-		color: #4ade80;
+		color: var(--diff-add-strong);
 	}
 
 	.diff-file-path {
@@ -1537,9 +1864,9 @@
 	}
 
 	.stage-btn.staged {
-		border-color: #0a1f0a;
-		background: #071507;
-		color: #4ade80;
+		border-color: var(--diff-add-gutter-bg);
+		background: var(--diff-add-bg);
+		color: var(--diff-add-strong);
 	}
 
 	.stage-btn.error {
@@ -1600,11 +1927,11 @@
 		white-space: pre;
 		width: 100%;
 		vertical-align: top;
-		color: var(--text-2);
+		color: var(--diff-text);
 	}
 
 	.hunk-row td {
-		background: #0d1a0d;
+		background: var(--diff-hunk-bg);
 		padding: 0.25rem 0;
 		border-top: 1px solid var(--border-2);
 		border-bottom: 1px solid var(--border-2);
@@ -1618,7 +1945,7 @@
 	}
 
 	.hunk-at {
-		color: #4a8f5a;
+		color: var(--diff-hunk-text);
 		font-weight: 700;
 		margin-right: 0.5rem;
 	}
@@ -1629,39 +1956,39 @@
 	}
 
 	.diff-row.add td {
-		background: #071507;
+		background: var(--diff-add-bg);
 	}
 
 	.diff-row.add .ln,
 	.diff-row.add .diff-sign {
-		background: #0a1f0a;
-		color: #4a8f5a;
+		background: var(--diff-add-gutter-bg);
+		color: var(--diff-add-gutter-text);
 	}
 
 	.diff-row.add .diff-sign {
-		color: #4ade80;
+		color: var(--diff-add-strong);
 	}
 
 	.diff-row.add .diff-content {
-		color: #9de8b0;
+		color: var(--diff-add-text);
 	}
 
 	.diff-row.remove td {
-		background: #1e0505;
+		background: var(--diff-del-bg);
 	}
 
 	.diff-row.remove .ln,
 	.diff-row.remove .diff-sign {
-		background: #2a0808;
-		color: #8f4a4a;
+		background: var(--diff-del-gutter-bg);
+		color: var(--diff-del-gutter-text);
 	}
 
 	.diff-row.remove .diff-sign {
-		color: var(--accent);
+		color: var(--diff-del-strong);
 	}
 
 	.diff-row.remove .diff-content {
-		color: #e8a0a0;
+		color: var(--diff-del-text);
 	}
 
 	.diff-row.context td {
@@ -1669,7 +1996,7 @@
 	}
 
 	.diff-row.context .diff-content {
-		color: var(--text-dim);
+		color: var(--diff-context-text);
 	}
 
 	/* ── Side-by-side table ─────────────────────────────────── */
@@ -1705,18 +2032,18 @@
 	}
 
 	.sbs-old.remove {
-		background: #1e0505;
-		color: #e8a0a0;
+		background: var(--diff-del-bg);
+		color: var(--diff-del-text);
 	}
 
 	.sbs-old.context,
 	.sbs-new.context {
-		color: var(--text-dim);
+		color: var(--diff-context-text);
 	}
 
 	.sbs-new.add {
-		background: #071507;
-		color: #9de8b0;
+		background: var(--diff-add-bg);
+		color: var(--diff-add-text);
 	}
 
 	.sbs-old.empty,
@@ -1735,14 +2062,14 @@
 
 	/* When left is remove, tint its ln too */
 	.sbs-row:has(.sbs-old.remove) .ln-old {
-		background: #2a0808;
-		color: #8f4a4a;
+		background: var(--diff-del-gutter-bg);
+		color: var(--diff-del-gutter-text);
 	}
 
 	/* When right is add, tint its ln too */
 	.sbs-row:has(.sbs-new.add) .ln-new {
-		background: #0a1f0a;
-		color: #4a8f5a;
+		background: var(--diff-add-gutter-bg);
+		color: var(--diff-add-gutter-text);
 	}
 
 	/* ── Gap rows (pull-in-lines) ───────────────────────────── */
@@ -1780,10 +2107,10 @@
 
 	/* ── Word highlight mark ────────────────────────────────── */
 	:global(mark.hl) {
-		background: rgba(250, 220, 80, 0.28);
+		background: var(--diff-highlight-bg);
 		color: inherit;
 		border-radius: 2px;
-		outline: 1px solid rgba(250, 220, 80, 0.4);
+		outline: 1px solid var(--diff-highlight-outline);
 	}
 
 	/* ── Copy-ref tooltip ───────────────────────────────────── */
@@ -1817,7 +2144,7 @@
 
 	/* ── Shared ─────────────────────────────────────────────── */
 	.stat-add {
-		color: #4ade80;
+		color: var(--diff-add-strong);
 		font-weight: 600;
 		font-variant-numeric: tabular-nums;
 	}
@@ -1846,11 +2173,11 @@
 	}
 
 	.box.add {
-		background: #4ade80;
+		background: var(--diff-add-strong);
 	}
 
 	.box.del {
-		background: var(--accent);
+		background: var(--diff-del-strong);
 	}
 
 	.box.empty {
@@ -1867,15 +2194,15 @@
 	}
 
 	.badge.new {
-		background: #071507;
-		color: #4ade80;
-		border: 1px solid #0a1f0a;
+		background: var(--diff-add-bg);
+		color: var(--diff-add-strong);
+		border: 1px solid var(--diff-add-gutter-bg);
 	}
 
 	.badge.untracked {
-		background: #0f0e02;
-		color: #c9a84c;
-		border: 1px solid #2a2508;
+		background: var(--diff-untracked-bg);
+		color: var(--diff-untracked-text);
+		border: 1px solid var(--diff-untracked-border);
 	}
 
 	.badge.del {

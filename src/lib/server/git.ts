@@ -97,6 +97,7 @@ export type DiffFile = {
 	isNew: boolean;
 	isDeleted: boolean;
 	isUntracked: boolean;
+	isStaged: boolean;
 };
 
 export function parseDiff(raw: string): DiffFile[] {
@@ -117,7 +118,8 @@ export function parseDiff(raw: string): DiffFile[] {
 				isBinary: false,
 				isNew: false,
 				isDeleted: false,
-				isUntracked: false
+				isUntracked: false,
+				isStaged: false
 			};
 			hunk = null;
 			files.push(file);
@@ -191,7 +193,8 @@ export function getUntrackedDiffs(cwd: string): DiffFile[] {
 					isBinary: true,
 					isNew: true,
 					isDeleted: false,
-					isUntracked: true
+					isUntracked: true,
+					isStaged: false
 				});
 				continue;
 			}
@@ -223,7 +226,8 @@ export function getUntrackedDiffs(cwd: string): DiffFile[] {
 				isBinary: false,
 				isNew: true,
 				isDeleted: false,
-				isUntracked: true
+				isUntracked: true,
+				isStaged: false
 			});
 		} catch {
 			// skip unreadable files (permissions, etc.)

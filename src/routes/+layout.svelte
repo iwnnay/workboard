@@ -30,6 +30,31 @@
 		--text-dim: #a06060;
 		--text-ghost: #6e4040;
 		--text-faint: #3f2020;
+
+		--diff-text: var(--text-2);
+		--diff-context-text: #ffecec;
+
+		--diff-add-text: #9de8b0;
+		--diff-add-bg: #071507;
+		--diff-add-gutter-bg: #0a1f0a;
+		--diff-add-gutter-text: #4a8f5a;
+		--diff-add-strong: #4ade80;
+
+		--diff-del-text: #e8a0a0;
+		--diff-del-bg: #1e0505;
+		--diff-del-gutter-bg: #2a0808;
+		--diff-del-gutter-text: #8f4a4a;
+		--diff-del-strong: var(--accent);
+
+		--diff-hunk-bg: #0d1a0d;
+		--diff-hunk-text: #4a8f5a;
+
+		--diff-untracked-text: #c9a84c;
+		--diff-untracked-bg: #0f0e02;
+		--diff-untracked-border: #2a2508;
+
+		--diff-highlight-bg: rgba(250, 220, 80, 0.28);
+		--diff-highlight-outline: rgba(250, 220, 80, 0.4);
 	}
 
 	:global(*, *::before, *::after) {
