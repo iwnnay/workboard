@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseDiff } from '$lib/server/git';
+import { markStagedFiles, parseDiff } from '$lib/server/git';
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
@@ -182,5 +182,29 @@ describe('parseDiff', () => {
 	it('handles file with path containing spaces', () => {
 		const raw = fileDiff({ path: 'src/my file.ts' });
 		expect(parseDiff(raw)[0].path).toBe('src/my file.ts');
+	});
+});
+
+describe('markStagedFiles', () => {
+	it('keeps files with both staged and unstaged changes in the unstaged group', () => {
+		const files = parseDiff(
+			makeDiff([
+				fileDiff({ path: 'staged.ts' }),
+				fileDiff({ path: 'mixed.ts' }),
+				fileDiff({ path: 'unstaged.ts' })
+			])
+		);
+
+		markStagedFiles(
+			files,
+			new Set(['staged.ts', 'mixed.ts']),
+			new Set(['mixed.ts', 'unstaged.ts'])
+		);
+
+		expect(Object.fromEntries(files.map((file) => [file.path, file.isStaged]))).toEqual({
+			'staged.ts': true,
+			'mixed.ts': false,
+			'unstaged.ts': false
+		});
 	});
 });

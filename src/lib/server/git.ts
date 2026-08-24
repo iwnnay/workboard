@@ -100,6 +100,16 @@ export type DiffFile = {
 	isStaged: boolean;
 };
 
+export function markStagedFiles(
+	files: DiffFile[],
+	stagedPaths: ReadonlySet<string>,
+	unstagedPaths: ReadonlySet<string>
+): void {
+	for (const file of files) {
+		file.isStaged = stagedPaths.has(file.path) && !unstagedPaths.has(file.path);
+	}
+}
+
 export function parseDiff(raw: string): DiffFile[] {
 	const files: DiffFile[] = [];
 	let file: DiffFile | null = null;

@@ -1,15 +1,16 @@
 import type { PageServerLoad } from './$types';
 import { execSync } from 'child_process';
-import { parseDiff, getUntrackedDiffs, tryGit } from '$lib/server/git';
+import { parseDiff, getUntrackedDiffs, markStagedFiles, tryGit } from '$lib/server/git';
 import { DEFAULT_DIFF_RANGE } from '$lib/constants';
 import { db } from '$lib/server/db';
 import { project } from '$lib/server/db/schema';
 import { asc } from 'drizzle-orm';
 
-const STAGED_LIST_TIMEOUT_MS = 10_000;
+const CHANGED_PATHS_TIMEOUT_MS = 10_000;
 
-function readStagedPaths(cwd: string): Set<string> {
-	const listing = tryGit(['diff', '--cached', '--name-only', '-z'], cwd, STAGED_LIST_TIMEOUT_MS);
+function readChangedPaths(cwd: string, staged: boolean): Set<string> {
+	const args = ['diff', ...(staged ? ['--cached'] : []), '--name-only', '-z'];
+	const listing = tryGit(args, cwd, CHANGED_PATHS_TIMEOUT_MS);
 	return new Set(listing ? listing.split('\0').filter(Boolean) : []);
 }
 
@@ -37,10 +38,9 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 			timeout: 10_000
 		});
 		const tracked = parseDiff(raw);
-		const stagedPaths = readStagedPaths(cwd);
-		for (const file of tracked) {
-			file.isStaged = stagedPaths.has(file.path);
-		}
+		const stagedPaths = readChangedPaths(cwd, true);
+		const unstagedPaths = readChangedPaths(cwd, false);
+		markStagedFiles(tracked, stagedPaths, unstagedPaths);
 		const trackedPaths = new Set(tracked.map((f) => f.path));
 		const untracked = getUntrackedDiffs(cwd).filter((f) => !trackedPaths.has(f.path));
 		return { files: [...tracked, ...untracked], range, error: null, projectId, projects, cwd };
