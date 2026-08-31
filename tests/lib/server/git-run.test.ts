@@ -30,7 +30,8 @@ describe('runGit', () => {
 		expect(spawnSync).toHaveBeenCalledWith('git', ['status'], {
 			encoding: 'utf8',
 			cwd: 'C:\\repo',
-			timeout: 30_000
+			timeout: 30_000,
+			maxBuffer: 10 * 1024 * 1024
 		});
 	});
 
@@ -76,7 +77,8 @@ describe('runGit', () => {
 		expect(spawnSync).toHaveBeenCalledWith('git', ['show', 'HEAD:file.ts'], {
 			encoding: 'utf8',
 			cwd: 'C:\\repo',
-			timeout: 5_000
+			timeout: 5_000,
+			maxBuffer: 10 * 1024 * 1024
 		});
 	});
 });

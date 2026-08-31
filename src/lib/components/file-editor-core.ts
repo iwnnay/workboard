@@ -13,7 +13,7 @@ import {
 	highlightActiveLineGutter
 } from '@codemirror/view';
 import { Prec, type Extension, type Text } from '@codemirror/state';
-import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
 import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 import {
 	indentOnInput,
@@ -236,7 +236,9 @@ export function createFileEditor(options: {
 					}
 				])
 			),
-			keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap])
+			// CodeMirror leaves Tab unbound by default so it can move focus. In this
+			// dedicated file editor, make it indent (and Shift-Tab outdent) instead.
+			keymap.of([indentWithTab, ...defaultKeymap, ...historyKeymap, ...searchKeymap])
 		]
 	});
 

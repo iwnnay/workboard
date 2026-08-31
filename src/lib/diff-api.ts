@@ -1,4 +1,5 @@
 import { api, query } from './api';
+import type { DiffFile } from '$lib/server/git';
 
 export type CommitResult = {
 	root: string;
@@ -9,6 +10,11 @@ export type CommitResult = {
 };
 
 export const diffApi = {
+	live: (projectId: string, range: string) =>
+		api.get<{ files: DiffFile[]; error: string | null }>(
+			`/api/diff/live${query({ projectId, range })}`
+		),
+
 	status: (projectId: string) =>
 		api.get<{ root: string; status: string }>(`/api/diff/status${query({ projectId })}`),
 

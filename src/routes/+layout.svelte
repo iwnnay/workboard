@@ -46,6 +46,13 @@
 		--diff-del-gutter-text: #8f4a4a;
 		--diff-del-strong: var(--accent);
 
+		--diff-incremental-add-bg: #092724;
+		--diff-incremental-add-gutter-bg: #0d3530;
+		--diff-incremental-add-text: #76e6d5;
+		--diff-incremental-del-bg: #301805;
+		--diff-incremental-del-gutter-bg: #442208;
+		--diff-incremental-del-text: #f3b562;
+
 		--diff-hunk-bg: #0d1a0d;
 		--diff-hunk-text: #4a8f5a;
 

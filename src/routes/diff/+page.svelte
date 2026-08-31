@@ -8,6 +8,12 @@
 	import FileEditor from '$lib/components/FileEditor.svelte';
 	import CommitModal from '$lib/components/CommitModal.svelte';
 	import { diffApi } from '$lib/diff-api';
+	import {
+		ABSENT_DIFF_FINGERPRINT,
+		diffFileFingerprint,
+		findIncrementalDiffLines,
+		findTouchedDiffPaths
+	} from '$lib/diff-snapshot';
 
 	let { data }: { data: PageData } = $props();
 
@@ -31,6 +37,14 @@
 	let _selectedPath = $state<string | null>(null);
 	let reviewed = new SvelteSet<string>();
 	let stagedPaths = new SvelteSet<string>();
+	let liveFiles = new SvelteMap<string, DiffFile>();
+	let acknowledgedFiles = new SvelteMap<string, DiffFile>();
+	let acknowledgedFingerprints = new SvelteMap<string, string>();
+	let touchedPaths = new SvelteSet<string>();
+	let liveChecked = $state(false);
+	let checkingLive = $state(false);
+	let liveError = $state('');
+	let showLive = $state(false);
 	let fileListWidth = $state(DEFAULT_FILE_LIST_WIDTH);
 	let resizeOrigin = $state<{ x: number; width: number } | null>(null);
 
@@ -50,12 +64,24 @@
 		selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null
 	);
 
+	const availableFiles = $derived.by(() => {
+		const files = new Map(data.files.map((file) => [file.path, file]));
+		if (liveChecked) {
+			for (const [path, file] of liveFiles) {
+				if (!files.has(path)) {
+					files.set(path, file);
+				}
+			}
+		}
+		return [...files.values()];
+	});
+
 	const orderedFiles = $derived(
-		[...data.files].sort((first, second) => first.path.localeCompare(second.path))
+		[...availableFiles].sort((first, second) => first.path.localeCompare(second.path))
 	);
 
 	const selectedPath = $derived(
-		_selectedPath && data.files.find((f) => f.path === _selectedPath)
+		_selectedPath && availableFiles.find((file) => file.path === _selectedPath)
 			? _selectedPath
 			: (orderedFiles[0]?.path ?? null)
 	);
@@ -73,9 +99,22 @@
 	const unstagedFiles = $derived(filteredFiles.filter((file) => !isStagedFile(file)));
 	const stagedFiles = $derived(filteredFiles.filter((file) => isStagedFile(file)));
 
-	const activeFile = $derived<DiffFile | null>(
-		data.files.find((f) => f.path === selectedPath) ?? null
+	const cachedActiveFile = $derived<DiffFile | null>(
+		data.files.find((file) => file.path === selectedPath) ?? null
 	);
+	const liveActiveFile = $derived<DiffFile | null>(
+		(selectedPath ? liveFiles.get(selectedPath) : null) ?? null
+	);
+	const viewingLive = $derived(liveChecked && showLive);
+	const activeFile = $derived<DiffFile | null>(
+		viewingLive ? liveActiveFile : (cachedActiveFile ?? liveActiveFile)
+	);
+	const incrementalLines = $derived.by(() => {
+		if (!viewingLive || !activeFile || !selectedPath) {
+			return new Set<DiffLine>();
+		}
+		return findIncrementalDiffLines(acknowledgedFiles.get(selectedPath), activeFile);
+	});
 
 	// ── Navigation ───────────────────────────────────────────
 
@@ -145,19 +184,13 @@
 		return `diff_reviewed_${projectId || 'default'}`;
 	}
 
-	function fileFingerprint(file: DiffFile): string {
-		const content = file.hunks
-			.map(
-				(hunk) => `${hunk.header}\n${hunk.lines.map((line) => line.type + line.content).join('\n')}`
-			)
-			.join('\n');
-		// FNV-1a
-		let hash = 0x811c9dc5;
-		for (let charIndex = 0; charIndex < content.length; charIndex++) {
-			hash ^= content.charCodeAt(charIndex);
-			hash = Math.imul(hash, 0x01000193);
+	function snapshotFingerprint(path: string): string {
+		if (liveChecked) {
+			const liveFile = liveFiles.get(path);
+			return liveFile ? diffFileFingerprint(liveFile) : ABSENT_DIFF_FINGERPRINT;
 		}
-		return `${(hash >>> 0).toString(36)}:${file.additions}:${file.deletions}`;
+		const cachedFile = data.files.find((file) => file.path === path);
+		return cachedFile ? diffFileFingerprint(cachedFile) : ABSENT_DIFF_FINGERPRINT;
 	}
 
 	function readStoredFingerprints(storageKey: string): Record<string, string> {
@@ -172,9 +205,9 @@
 	function persistReviewed() {
 		const storageKey = reviewedStorageKey(data.projectId);
 		const storedFingerprints = readStoredFingerprints(storageKey);
-		for (const file of data.files) {
+		for (const file of availableFiles) {
 			if (reviewed.has(file.path)) {
-				storedFingerprints[file.path] = fileFingerprint(file);
+				storedFingerprints[file.path] = snapshotFingerprint(file.path);
 			} else {
 				delete storedFingerprints[file.path];
 			}
@@ -187,8 +220,48 @@
 			reviewed.delete(path);
 		} else {
 			reviewed.add(path);
+			acknowledgedFingerprints.set(path, snapshotFingerprint(path));
+			const acknowledgedFile = liveChecked
+				? liveFiles.get(path)
+				: data.files.find((file) => file.path === path);
+			if (acknowledgedFile) {
+				acknowledgedFiles.set(path, acknowledgedFile);
+			} else {
+				acknowledgedFiles.delete(path);
+			}
+			touchedPaths.delete(path);
 		}
 		persistReviewed();
+	}
+
+	async function checkLiveChanges() {
+		if (checkingLive) {
+			return;
+		}
+		checkingLive = true;
+		liveError = '';
+		try {
+			const result = await diffApi.live(data.projectId, data.range);
+			if (result.error) {
+				throw new Error(result.error);
+			}
+			const nextFiles = new Map(result.files.map((file) => [file.path, file]));
+			liveFiles.clear();
+			for (const [path, file] of nextFiles) {
+				liveFiles.set(path, file);
+			}
+			touchedPaths.clear();
+			for (const path of findTouchedDiffPaths(acknowledgedFingerprints, nextFiles.values())) {
+				touchedPaths.add(path);
+				reviewed.delete(path);
+			}
+			liveChecked = true;
+			showLive = true;
+		} catch (caught) {
+			liveError = caught instanceof Error ? caught.message : String(caught);
+		} finally {
+			checkingLive = false;
+		}
 	}
 
 	// Restore checkmarks whenever a diff loads; a file stays checked only if
@@ -201,9 +274,18 @@
 			fileLineTotals.clear();
 			stagedPaths.clear();
 			reviewed.clear();
+			liveFiles.clear();
+			acknowledgedFiles.clear();
+			acknowledgedFingerprints.clear();
+			touchedPaths.clear();
+			liveChecked = false;
+			liveError = '';
+			showLive = false;
 			const storedFingerprints = readStoredFingerprints(storageKey);
 			for (const file of currentFiles) {
-				if (storedFingerprints[file.path] === fileFingerprint(file)) {
+				acknowledgedFiles.set(file.path, file);
+				acknowledgedFingerprints.set(file.path, diffFileFingerprint(file));
+				if (storedFingerprints[file.path] === diffFileFingerprint(file)) {
 					reviewed.add(file.path);
 				}
 			}
@@ -769,6 +851,7 @@
 		class="file-item"
 		class:active={selectedPath === file.path}
 		class:is-reviewed={reviewed.has(file.path)}
+		class:is-touched={touchedPaths.has(file.path)}
 		role="button"
 		tabindex="0"
 		onclick={() => selectFile(file.path)}
@@ -784,6 +867,10 @@
 					class="badge new">N</span
 				>{/if}
 			{#if file.isDeleted}<span class="badge del">D</span>{/if}
+			{#if touchedPaths.has(file.path)}<span
+					class="badge touched"
+					title="Changed since acknowledged">Δ</span
+				>{/if}
 		</span>
 		<span class="file-stats">
 			{#if file.isBinary}
@@ -804,7 +891,7 @@
 				e.stopPropagation();
 				toggleReviewed(file.path);
 			}}
-			aria-label="Mark as reviewed">✓</button
+			aria-label={reviewed.has(file.path) ? 'Mark as not reviewed' : 'Mark as reviewed'}>✓</button
 		>
 	</div>
 {/snippet}
@@ -950,6 +1037,24 @@
 				Run
 			{/if}
 		</button>
+		<button
+			class="check-btn"
+			class:loading={checkingLive}
+			class:has-changes={touchedPaths.size > 0}
+			disabled={checkingLive || loading}
+			onclick={checkLiveChanges}
+			title="Compare the current filesystem diff with the acknowledged snapshot"
+		>
+			{#if checkingLive}
+				<span class="spinner"></span>
+			{:else if touchedPaths.size > 0}
+				Δ {touchedPaths.size}
+			{:else if liveChecked}
+				✓ Current
+			{:else}
+				Check changes
+			{/if}
+		</button>
 
 		<button
 			class="stage-btn topbar-stage-btn"
@@ -975,6 +1080,9 @@
 
 		{#if data.error}
 			<span class="error-badge" title={data.error}>Error</span>
+		{/if}
+		{#if liveError}
+			<span class="error-badge" title={liveError}>Check failed</span>
 		{/if}
 	</header>
 
@@ -1042,7 +1150,9 @@
 		<main class="diff-panel" class:editing onmouseup={handleDiffMouseUp}>
 			{#if !activeFile}
 				<div class="diff-empty">
-					{#if data.error}
+					{#if viewingLive && selectedPath}
+						<p><code>{selectedPath}</code> no longer differs from <code>{data.range}</code>.</p>
+					{:else if data.error}
 						<p class="diff-error-msg">{data.error}</p>
 					{:else}
 						<p>No changes in <code>{data.range}</code>.</p>
@@ -1067,6 +1177,23 @@
 							>
 						</span>
 						<span class="diff-file-meta">
+							{#if selectedPath && touchedPaths.has(selectedPath)}
+								<span
+									class="badge incremental"
+									title="Teal + and amber − lines changed since this file was last acknowledged"
+									>Δ since check</span
+								>
+							{/if}
+							{#if liveChecked}
+								<span class="snapshot-toggle" aria-label="Diff snapshot">
+									<button
+										class:active={!showLive}
+										onclick={() => (showLive = false)}
+										disabled={!cachedActiveFile}>Cached</button
+									>
+									<button class:active={showLive} onclick={() => (showLive = true)}>Live</button>
+								</span>
+							{/if}
 							{#if activeFile.isUntracked}<span class="badge untracked">untracked</span
 								>{:else if activeFile.isNew}<span class="badge new">new file</span>{/if}
 							{#if activeFile.isDeleted}<span class="badge del">deleted</span>{/if}
@@ -1157,13 +1284,19 @@
 											{#each computeSideBySide(hunk.lines) as row, i (i)}
 												<tr class="diff-row sbs-row">
 													<td class="ln ln-old">{row.left?.oldNum ?? ''}</td>
-													<td class="diff-content sbs-old {row.left ? row.left.type : 'empty'}"
+													<td
+														class="diff-content sbs-old {row.left ? row.left.type : 'empty'}"
+														class:incremental-remove={row.left?.type === 'remove' &&
+															incrementalLines.has(row.left)}
 														>{#each splitContent(row.left?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark
 																	class="hl">{part.text}</mark
 																>{:else}{part.text}{/if}{/each}</td
 													>
 													<td class="ln ln-new">{row.right?.newNum ?? ''}</td>
-													<td class="diff-content sbs-new {row.right ? row.right.type : 'empty'}"
+													<td
+														class="diff-content sbs-new {row.right ? row.right.type : 'empty'}"
+														class:incremental-add={row.right?.type === 'add' &&
+															incrementalLines.has(row.right)}
 														>{#each splitContent(row.right?.content ?? '', highlightWord) as part, j (j)}{#if part.hl}<mark
 																	class="hl">{part.text}</mark
 																>{:else}{part.text}{/if}{/each}</td
@@ -1196,7 +1329,12 @@
 												</td>
 											</tr>
 											{#each hunk.lines as line, i (i)}
-												<tr class="diff-row {line.type}">
+												<tr
+													class="diff-row {line.type}"
+													class:incremental-add={line.type === 'add' && incrementalLines.has(line)}
+													class:incremental-remove={line.type === 'remove' &&
+														incrementalLines.has(line)}
+												>
 													<td class="ln ln-old">{line.oldNum ?? ''}</td>
 													<td class="ln ln-new">{line.newNum ?? ''}</td>
 													<td class="diff-sign">
@@ -1499,6 +1637,32 @@
 		min-width: 48px;
 	}
 
+	.check-btn {
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 5px;
+		color: var(--text-ghost);
+		padding: 0.3rem 0.75rem;
+		font-size: 0.8125rem;
+		flex-shrink: 0;
+		transition:
+			background 0.15s,
+			border-color 0.15s,
+			color 0.15s;
+	}
+
+	.check-btn:hover:not(:disabled),
+	.check-btn.has-changes {
+		background: var(--diff-untracked-bg);
+		border-color: var(--diff-untracked-border);
+		color: var(--diff-untracked-text);
+	}
+
+	.check-btn:disabled {
+		cursor: not-allowed;
+		opacity: 0.7;
+	}
+
 	.spinner {
 		display: inline-block;
 		width: 12px;
@@ -1631,6 +1795,10 @@
 
 	.file-item.is-reviewed {
 		opacity: 0.5;
+	}
+
+	.file-item.is-touched {
+		box-shadow: inset 2px 0 var(--diff-untracked-text);
 	}
 
 	.review-btn {
@@ -1807,6 +1975,35 @@
 		gap: 0.5rem;
 		flex-shrink: 0;
 		font-size: 0.8125rem;
+	}
+
+	.snapshot-toggle {
+		display: inline-flex;
+		border: 1px solid var(--border);
+		border-radius: 4px;
+		overflow: hidden;
+	}
+
+	.snapshot-toggle button {
+		background: var(--surface-2);
+		border: 0;
+		color: var(--text-ghost);
+		font-size: 0.7rem;
+		padding: 0.15rem 0.4rem;
+	}
+
+	.snapshot-toggle button + button {
+		border-left: 1px solid var(--border);
+	}
+
+	.snapshot-toggle button.active {
+		background: var(--accent-bg);
+		color: var(--accent);
+	}
+
+	.snapshot-toggle button:disabled {
+		cursor: not-allowed;
+		opacity: 0.45;
 	}
 
 	/* ── Side-by-side toggle ────────────────────────────────── */
@@ -1991,6 +2188,36 @@
 		color: var(--diff-del-text);
 	}
 
+	.diff-row.incremental-add td {
+		background: var(--diff-incremental-add-bg);
+	}
+
+	.diff-row.incremental-add .ln,
+	.diff-row.incremental-add .diff-sign {
+		background: var(--diff-incremental-add-gutter-bg);
+		color: var(--diff-incremental-add-text);
+	}
+
+	.diff-row.incremental-add .diff-content {
+		color: var(--diff-incremental-add-text);
+		box-shadow: inset 3px 0 var(--diff-incremental-add-text);
+	}
+
+	.diff-row.incremental-remove td {
+		background: var(--diff-incremental-del-bg);
+	}
+
+	.diff-row.incremental-remove .ln,
+	.diff-row.incremental-remove .diff-sign {
+		background: var(--diff-incremental-del-gutter-bg);
+		color: var(--diff-incremental-del-text);
+	}
+
+	.diff-row.incremental-remove .diff-content {
+		color: var(--diff-incremental-del-text);
+		box-shadow: inset 3px 0 var(--diff-incremental-del-text);
+	}
+
 	.diff-row.context td {
 		background: var(--bg-2);
 	}
@@ -2046,6 +2273,18 @@
 		color: var(--diff-add-text);
 	}
 
+	.sbs-old.remove.incremental-remove {
+		background: var(--diff-incremental-del-bg);
+		color: var(--diff-incremental-del-text);
+		box-shadow: inset 3px 0 var(--diff-incremental-del-text);
+	}
+
+	.sbs-new.add.incremental-add {
+		background: var(--diff-incremental-add-bg);
+		color: var(--diff-incremental-add-text);
+		box-shadow: inset 3px 0 var(--diff-incremental-add-text);
+	}
+
 	.sbs-old.empty,
 	.sbs-new.empty {
 		background: var(--surface);
@@ -2070,6 +2309,16 @@
 	.sbs-row:has(.sbs-new.add) .ln-new {
 		background: var(--diff-add-gutter-bg);
 		color: var(--diff-add-gutter-text);
+	}
+
+	.sbs-row:has(.sbs-old.incremental-remove) .ln-old {
+		background: var(--diff-incremental-del-gutter-bg);
+		color: var(--diff-incremental-del-text);
+	}
+
+	.sbs-row:has(.sbs-new.incremental-add) .ln-new {
+		background: var(--diff-incremental-add-gutter-bg);
+		color: var(--diff-incremental-add-text);
 	}
 
 	/* ── Gap rows (pull-in-lines) ───────────────────────────── */
@@ -2209,6 +2458,23 @@
 		background: var(--accent-bg);
 		color: var(--accent);
 		border: 1px solid var(--accent-muted);
+	}
+
+	.badge.touched {
+		background: var(--diff-untracked-bg);
+		color: var(--diff-untracked-text);
+		border: 1px solid var(--diff-untracked-border);
+	}
+
+	.badge.incremental {
+		background: linear-gradient(
+			90deg,
+			var(--diff-incremental-add-bg),
+			var(--diff-incremental-del-bg)
+		);
+		color: var(--diff-untracked-text);
+		border: 1px solid var(--diff-untracked-border);
+		text-transform: none;
 	}
 
 	.binary-notice {

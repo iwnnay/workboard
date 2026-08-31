@@ -149,6 +149,14 @@ describe('parseDiff', () => {
 		expect(file.deletions).toBe(0);
 	});
 
+	it('keeps Git object ids so binary changes have a stable identity', () => {
+		const raw = fileDiff({ path: 'image.png', isBinary: true }).replace(
+			'Binary files',
+			'index abc123..def456 100644\nBinary files'
+		);
+		expect(parseDiff(raw)[0].revision).toBe('abc123..def456');
+	});
+
 	it('marks all parsed files as not untracked', () => {
 		const raw = fileDiff({ hunks: ['@@ -1,1 +1,1 @@\n-a\n+b'] });
 		expect(parseDiff(raw)[0].isUntracked).toBe(false);

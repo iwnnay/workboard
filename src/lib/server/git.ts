@@ -1,9 +1,11 @@
 import { readFileSync } from 'fs';
+import { createHash } from 'crypto';
 import { join } from 'path';
 import { spawnSync } from 'child_process';
 import { ApiError } from './http';
 
 const GIT_TIMEOUT_MS = 30_000;
+const GIT_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 export type GitOutcome = {
 	stdout: string;
@@ -19,7 +21,12 @@ function execGit(
 	operation: string,
 	timeoutMs = GIT_TIMEOUT_MS
 ): GitOutcome {
-	const result = spawnSync('git', args, { encoding: 'utf8', cwd, timeout: timeoutMs });
+	const result = spawnSync('git', args, {
+		encoding: 'utf8',
+		cwd,
+		timeout: timeoutMs,
+		maxBuffer: GIT_MAX_BUFFER_BYTES
+	});
 	const stdout = result.stdout ?? '';
 	const output = [stdout.trim(), result.stderr?.trim()].filter(Boolean).join('\n');
 	const subcommand = args[0] ?? '(none)';
@@ -98,6 +105,8 @@ export type DiffFile = {
 	isDeleted: boolean;
 	isUntracked: boolean;
 	isStaged: boolean;
+	/** Git object ids (or a content digest for untracked binary files). */
+	revision?: string;
 };
 
 export function markStagedFiles(
@@ -141,7 +150,9 @@ export function parseDiff(raw: string): DiffFile[] {
 			file.isDeleted = true;
 		} else if (line.startsWith('Binary files')) {
 			file.isBinary = true;
-		} else if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('index ')) {
+		} else if (line.startsWith('index ')) {
+			file.revision = line.slice('index '.length).split(' ')[0];
+		} else if (line.startsWith('--- ') || line.startsWith('+++ ')) {
 			continue;
 		} else if (line.startsWith('@@ ')) {
 			const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)/);
@@ -204,7 +215,8 @@ export function getUntrackedDiffs(cwd: string): DiffFile[] {
 					isNew: true,
 					isDeleted: false,
 					isUntracked: true,
-					isStaged: false
+					isStaged: false,
+					revision: createHash('sha256').update(buf).digest('base64url')
 				});
 				continue;
 			}
