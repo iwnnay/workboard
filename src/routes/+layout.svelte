@@ -15,24 +15,7 @@
 
 <style>
 	:global(:root) {
-		--bg: #0e0404;
-		--bg-2: #0b0303;
-		--surface: #180808;
-		--surface-2: #1e0b0b;
-		--border: #2d1212;
-		--border-2: #180808;
-		--accent: #ef4444;
-		--accent-muted: #7f1d1d;
-		--accent-bg: #2d0a0a;
-		--text: #f5eaea;
-		--text-2: #e0c0c0;
-		--text-muted: #c48888;
-		--text-dim: #a06060;
-		--text-ghost: #6e4040;
-		--text-faint: #3f2020;
-
 		--diff-text: var(--text-2);
-		--diff-context-text: #ffecec;
 
 		--diff-add-text: #9de8b0;
 		--diff-add-bg: #071507;
@@ -44,7 +27,7 @@
 		--diff-del-bg: #1e0505;
 		--diff-del-gutter-bg: #2a0808;
 		--diff-del-gutter-text: #8f4a4a;
-		--diff-del-strong: var(--accent);
+		--diff-del-strong: #ef4444;
 
 		--diff-incremental-add-bg: #092724;
 		--diff-incremental-add-gutter-bg: #0d3530;

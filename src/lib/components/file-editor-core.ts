@@ -142,7 +142,7 @@ const editorTheme = EditorView.theme(
 			backgroundColor: 'var(--accent-bg)'
 		},
 		'.cm-selectionMatch': { backgroundColor: 'rgba(250, 220, 80, 0.15)' },
-		'.cm-activeLine': { backgroundColor: 'rgba(239, 68, 68, 0.06)' },
+		'.cm-activeLine': { backgroundColor: 'var(--accent-soft)' },
 		'.cm-gutters': {
 			backgroundColor: 'var(--bg-2)',
 			color: 'var(--text-ghost)',
