@@ -7,6 +7,7 @@
 	import { goto, invalidate } from '$app/navigation';
 	import FileEditor from '$lib/components/FileEditor.svelte';
 	import CommitModal from '$lib/components/CommitModal.svelte';
+	import CodeSearchModal from '$lib/components/CodeSearchModal.svelte';
 	import { diffApi } from '$lib/diff-api';
 	import {
 		ABSENT_DIFF_FINGERPRINT,
@@ -53,7 +54,8 @@
 	let editing = $state(false);
 	let editorDirty = $state(false);
 	let highlightWord = $state('');
-	let copyRef = $state<{ x: number; y: number; ref: string } | null>(null);
+	let copyRef = $state<{ x: number; y: number; ref: string; searchText: string } | null>(null);
+	let codeSearchQuery = $state<string | null>(null);
 	let expandedGaps = new SvelteMap<string, string[]>();
 	let fileLineTotals = new SvelteMap<string, number>();
 	let diffTableRoot = $state<HTMLElement | null>(null);
@@ -712,7 +714,9 @@
 
 		const lineRef = a !== b && b !== null ? `${Math.min(a, b)}-${Math.max(a, b)}` : String(a);
 
-		copyRef = { x: e.clientX, y: e.clientY, ref: `${activeFile.path}:${lineRef}` };
+		const searchText = text.includes('\n') ? '' : text;
+
+		copyRef = { x: e.clientX, y: e.clientY, ref: `${activeFile.path}:${lineRef}`, searchText };
 	}
 
 	async function doCopyRef() {
@@ -727,6 +731,14 @@
 				copyRef = null;
 			}
 		}, 1200);
+	}
+
+	function openCodeSearch() {
+		if (!copyRef?.searchText) {
+			return;
+		}
+		codeSearchQuery = copyRef.searchText;
+		copyRef = null;
 	}
 
 	// ── Copy file path ────────────────────────────────────────
@@ -843,7 +855,23 @@
 {#if copyRef}
 	<div class="copy-ref-tooltip" style="left: {copyRef.x}px; top: {copyRef.y - 40}px">
 		<button class="copy-ref-btn" onclick={doCopyRef}>{copyRef.ref}</button>
+		{#if copyRef.searchText}
+			<button
+				class="copy-ref-btn search-lens-btn"
+				title="Find “{copyRef.searchText}” in the codebase"
+				aria-label="Find the selected text in the codebase"
+				onclick={openCodeSearch}>&#x1F50D;&#xFE0E;</button
+			>
+		{/if}
 	</div>
+{/if}
+
+{#if codeSearchQuery !== null}
+	<CodeSearchModal
+		projectId={data.projectId}
+		initialQuery={codeSearchQuery}
+		onClose={() => (codeSearchQuery = null)}
+	/>
 {/if}
 
 {#snippet fileRow(file: DiffFile)}
@@ -2368,6 +2396,12 @@
 		z-index: 100;
 		pointer-events: auto;
 		transform: translateX(-50%);
+		display: flex;
+		gap: 0.25rem;
+	}
+
+	.search-lens-btn {
+		padding: 0.25rem 0.5rem;
 	}
 
 	.copy-ref-btn {

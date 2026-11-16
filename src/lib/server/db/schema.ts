@@ -1,4 +1,4 @@
-import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
+import { integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 export const todo = sqliteTable('todo', {
 	id: text('id')
@@ -44,6 +44,39 @@ export const project = sqliteTable('project', {
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())
 });
+
+/** Directories and durable per-file review snapshots for the Full Review page. */
+export const fullReviewScope = sqliteTable(
+	'full_review_scope',
+	{
+		projectId: text('project_id').notNull(),
+		path: text('path').notNull(),
+		lastPolledAt: text('last_polled_at'),
+		createdAt: text('created_at')
+			.notNull()
+			.$defaultFn(() => new Date().toISOString())
+	},
+	(table) => [primaryKey({ columns: [table.projectId, table.path] })]
+);
+
+export const fullReviewFile = sqliteTable(
+	'full_review_file',
+	{
+		projectId: text('project_id').notNull(),
+		path: text('path').notNull(),
+		/** Hash at reset time, or at the most recent manual check-off. */
+		baselineFingerprint: text('baseline_fingerprint'),
+		/** Most recently observed hash. Null means the file was deleted. */
+		currentFingerprint: text('current_fingerprint'),
+		byteSize: integer('byte_size').notNull().default(0),
+		modifiedAt: text('modified_at'),
+		checked: integer('checked', { mode: 'boolean' }).notNull().default(false),
+		checkedAt: text('checked_at'),
+		changedAt: text('changed_at'),
+		firstSeenAt: text('first_seen_at').notNull()
+	},
+	(table) => [primaryKey({ columns: [table.projectId, table.path] })]
+);
 
 export const bookmarkFolder = sqliteTable('bookmark_folder', {
 	id: text('id')

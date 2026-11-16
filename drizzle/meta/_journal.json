@@ -36,6 +36,13 @@
       "when": 1785963855632,
       "tag": "0004_serious_bastion",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1788880397195,
+      "tag": "0005_safe_stryfe",
+      "breakpoints": true
     }
   ]
 }

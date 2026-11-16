@@ -7,6 +7,7 @@
 		{ href: '/', label: 'Dashboard' },
 		{ href: '/bookmarks', label: 'Bookmarks' },
 		{ href: '/diff', label: 'Diff' },
+		{ href: '/full-review', label: 'Full Review' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/docs', label: 'Docs' },
 		{ href: '/ollama', label: 'Ollama' },
