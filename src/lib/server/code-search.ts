@@ -78,7 +78,7 @@ const previewOf = (lineText: string, column: number): string => {
 	return `…${trimmed.slice(start, start + maxPreviewLength)}…`;
 };
 
-const alwaysSearchedDirectories = ['src', 'db', 'scripts'];
+const alwaysSearchedDirectories = ['src', 'db', 'scripts', 'packages'];
 
 export const searchDirectories = (includeTests: boolean): string[] =>
 	includeTests ? [...alwaysSearchedDirectories, 'tests'] : alwaysSearchedDirectories;
