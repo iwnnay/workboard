@@ -1,6 +1,8 @@
 <script lang="ts">
 	import favicon from '$lib/assets/favicon.svg';
 	import NavDrawer from '$lib/components/NavDrawer.svelte';
+	import ProjectsModal from '$lib/components/ProjectsModal.svelte';
+	import { projectsManager } from '$lib/projects-manager.svelte';
 
 	let { children } = $props();
 </script>
@@ -12,6 +14,10 @@
 
 {@render children()}
 <NavDrawer />
+
+{#if projectsManager.open}
+	<ProjectsModal onClose={projectsManager.hide} />
+{/if}
 
 <style>
 	:global(:root) {

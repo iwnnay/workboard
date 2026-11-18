@@ -40,6 +40,7 @@ export const project = sqliteTable('project', {
 		.$defaultFn(() => crypto.randomUUID()),
 	name: text('name').notNull(),
 	path: text('path').notNull(),
+	settings: text('settings').notNull().default('{}'),
 	createdAt: text('created_at')
 		.notNull()
 		.$defaultFn(() => new Date().toISOString())

@@ -1,3 +1,5 @@
+import type { ProjectSettings } from './project-settings';
+
 export type Todo = {
 	id: string;
 	text: string;
@@ -18,7 +20,14 @@ export type Project = {
 	id: string;
 	name: string;
 	path: string;
+	settings: ProjectSettings;
 	createdAt: string;
+};
+
+export type ProjectDraft = {
+	name?: string;
+	path?: string;
+	settings?: Partial<ProjectSettings>;
 };
 
 export type BookmarkFolder = {
@@ -121,6 +130,15 @@ export type DirectoryListing = {
 	/** Null at a filesystem root, where there is nowhere further up to go. */
 	parent: string | null;
 	entries: DirectoryEntry[];
+};
+
+export type FolderShortcut = {
+	label: string;
+	path: string;
+};
+
+export type FolderListing = DirectoryListing & {
+	shortcuts: FolderShortcut[];
 };
 
 /** Editable subset of a Bookmark — used by the inline edit/create forms. */

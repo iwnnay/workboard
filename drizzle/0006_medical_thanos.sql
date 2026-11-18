@@ -1,0 +1,1 @@
+ALTER TABLE `project` ADD `settings` text DEFAULT '{}' NOT NULL;

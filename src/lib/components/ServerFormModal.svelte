@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { page } from '$app/state';
+	import { findOwningProject } from '$lib/folder-paths';
 	import DirectoryPickerModal from '$lib/components/DirectoryPickerModal.svelte';
 	import { serversApi } from '$lib/servers-api';
 	import { describeStartCommand, isValidPort } from '$lib/start-command';
-	import type { ManagedServer, ManagedServerDraft, ServerType } from '$lib/types';
+	import type { ManagedServer, ManagedServerDraft, Project, ServerType } from '$lib/types';
 
 	let {
 		server = null,
@@ -57,6 +59,10 @@
 	}
 
 	const isEditing = $derived(server !== null);
+	const projects = $derived<Project[]>(page.data.projects ?? []);
+	const owningProject = $derived(
+		directory.trim() ? findOwningProject(projects, directory.trim()) : null
+	);
 
 	const draftPort = $derived.by(() => {
 		const trimmed = portText.trim();
@@ -112,6 +118,13 @@
 			detecting = false;
 		}
 	}
+
+	const chooseProject = (projectId: string) => {
+		const chosen = projects.find((entry) => entry.id === projectId);
+		if (chosen) {
+			void applyDetection(chosen.path);
+		}
+	};
 
 	function buildDraft(port: number): ManagedServerDraft {
 		return {
@@ -199,6 +212,27 @@
 		</header>
 
 		<div class="form">
+			{#if projects.length > 0}
+				<div class="field">
+					<label class="field-label" for="server-project">Project</label>
+					<select
+						id="server-project"
+						class="input"
+						value={owningProject?.id ?? ''}
+						onchange={(event) => chooseProject(event.currentTarget.value)}
+					>
+						<option value="" disabled={!!owningProject}>Not part of a project</option>
+						{#each projects as entry (entry.id)}
+							<option value={entry.id}>{entry.name}</option>
+						{/each}
+					</select>
+					<span class="hint"
+						>Picking a project fills in its folder. Servers belong to the project whose folder they
+						run in.</span
+					>
+				</div>
+			{/if}
+
 			<div class="field">
 				<label class="field-label" for="server-directory">Directory</label>
 				<div class="dir-row">

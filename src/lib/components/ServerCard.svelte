@@ -14,6 +14,7 @@
 		status,
 		busy = false,
 		error = '',
+		projectName = null,
 		onRefresh,
 		onToggle,
 		onRestart,
@@ -23,6 +24,7 @@
 		status: ServerStatus | undefined;
 		busy?: boolean;
 		error?: string;
+		projectName?: string | null;
 		onRefresh: () => void;
 		onToggle: () => void;
 		onRestart: () => void;
@@ -40,6 +42,7 @@
 			<span class="alias">{server.alias}</span>
 			<span class="type-tag">{SERVER_TYPE_TAGS[server.serverType]}</span>
 			<span class="port-tag mono">:{server.port}</span>
+			{#if projectName}<span class="project-tag" title="Project">{projectName}</span>{/if}
 		</div>
 		<div class="directory mono">{server.directory}</div>
 	</div>
@@ -150,6 +153,14 @@
 		color: var(--text-dim);
 		border: 1px solid var(--border);
 		background: var(--surface-2);
+		border-radius: 3px;
+		padding: 0 0.35rem;
+	}
+
+	.project-tag {
+		font-size: 0.65rem;
+		color: var(--accent);
+		border: 1px solid var(--accent-muted);
 		border-radius: 3px;
 		padding: 0 0.35rem;
 	}

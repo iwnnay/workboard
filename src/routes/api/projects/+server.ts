@@ -1,15 +1,8 @@
-import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { project } from '$lib/server/db/schema';
-import { asc } from 'drizzle-orm';
+import type { RequestHandler } from './$types';
+import { readJsonBody, route } from '$lib/server/http';
+import { createProject, listProjects } from '$lib/server/projects';
 
-export async function GET() {
-	const projects = await db.select().from(project).orderBy(asc(project.name));
-	return json(projects);
-}
+export const GET: RequestHandler = () => route(() => listProjects());
 
-export async function POST({ request }) {
-	const { name, path } = await request.json();
-	const [created] = await db.insert(project).values({ name, path }).returning();
-	return json(created);
-}
+export const POST: RequestHandler = ({ request }) =>
+	route(async () => createProject(await readJsonBody(request)), { status: 201 });

@@ -1,19 +1,10 @@
-import { json } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { project } from '$lib/server/db/schema';
-import { eq } from 'drizzle-orm';
+import type { RequestHandler } from './$types';
+import { readJsonBody, route } from '$lib/server/http';
+import { deleteProject, getProject, updateProject } from '$lib/server/projects';
 
-export async function PATCH({ params, request }) {
-	const { name } = await request.json();
-	const [updated] = await db
-		.update(project)
-		.set({ name })
-		.where(eq(project.id, params.id))
-		.returning();
-	return json(updated);
-}
+export const GET: RequestHandler = ({ params }) => route(() => getProject(params.id));
 
-export async function DELETE({ params }) {
-	await db.delete(project).where(eq(project.id, params.id));
-	return json({ success: true });
-}
+export const PATCH: RequestHandler = ({ params, request }) =>
+	route(async () => updateProject(params.id, await readJsonBody(request)));
+
+export const DELETE: RequestHandler = ({ params }) => route(() => deleteProject(params.id));

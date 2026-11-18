@@ -3,6 +3,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import Modal from '$lib/components/Modal.svelte';
 	import { codeSearchApi } from '$lib/code-search-api';
+	import { projectsManager } from '$lib/projects-manager.svelte';
 	import type { CodeSearchMatch } from '$lib/server/code-search';
 
 	let {
@@ -22,7 +23,9 @@
 	let includeTests = $state(false);
 	let matches = $state<CodeSearchMatch[]>([]);
 	let searchedFiles = $state(0);
-	let searchedDirectories = $state<string[]>([]);
+	let sourceNote = $state<string | null>(null);
+	let testsExcluded = $state(false);
+	let awaitingSettings = $state(false);
 	let truncated = $state(false);
 	let searching = $state(false);
 	let searchError = $state('');
@@ -137,7 +140,8 @@
 			}
 			matches = result.matches;
 			searchedFiles = result.searchedFiles;
-			searchedDirectories = result.directories;
+			sourceNote = result.sourceNote;
+			testsExcluded = result.testsExcluded;
 			truncated = result.truncated;
 			selectedIndex = -1;
 			previewLines = [];
@@ -175,6 +179,11 @@
 		}
 	};
 
+	const openSettings = () => {
+		awaitingSettings = true;
+		projectsManager.show(projectId);
+	};
+
 	onMount(() => {
 		try {
 			includeTests = localStorage.getItem(includeTestsKey) === '1';
@@ -183,6 +192,16 @@
 		}
 		searchInput?.focus();
 		searchInput?.select();
+	});
+
+	$effect(() => {
+		if (awaitingSettings && !projectsManager.open) {
+			awaitingSettings = false;
+			void runSearch(
+				untrack(() => searchText),
+				untrack(() => includeTests)
+			);
+		}
 	});
 
 	$effect(() => {
@@ -218,13 +237,22 @@
 					files
 				{/if}
 			</span>
+			{#if projectId}
+				<button class="settings-link" onclick={openSettings}>Search settings…</button>
+			{/if}
 		</div>
+
+		{#if sourceNote}
+			<div class="source-note">{sourceNote}</div>
+		{/if}
 
 		<div class="results" bind:this={resultsPane}>
 			{#if searchError}
 				<div class="msg error">{searchError}</div>
 			{:else if !searching && activeQuery && matches.length === 0}
-				<div class="msg">No matches in {searchedDirectories.join(', ')}.</div>
+				<div class="msg">
+					No matches{testsExcluded ? ' outside test files' : ''}.
+				</div>
 			{:else}
 				{#each matches as match, matchIndex (`${match.path}:${match.line}`)}
 					<button
@@ -333,6 +361,24 @@
 		white-space: nowrap;
 		min-width: 10rem;
 		text-align: right;
+	}
+
+	.settings-link {
+		color: var(--text-dim);
+		font-size: 0.75rem;
+		white-space: nowrap;
+	}
+
+	.settings-link:hover {
+		color: var(--accent);
+	}
+
+	.source-note {
+		padding: 0.375rem 1rem;
+		border-bottom: 1px solid var(--border);
+		color: var(--text-dim);
+		font-size: 0.75rem;
+		white-space: pre-wrap;
 	}
 
 	.results {

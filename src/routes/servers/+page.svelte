@@ -5,6 +5,7 @@
 	import { serversApi } from '$lib/servers-api';
 	import { ServersStore } from '$lib/servers-store.svelte';
 	import { formatClockTime, isServerRunning } from '$lib/servers-view';
+	import { findOwningProject } from '$lib/folder-paths';
 	import type { ManagedServer } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -115,6 +116,7 @@
 					status={store.statusFor(server.id)}
 					busy={store.isBusy(server.id)}
 					error={store.errorFor(server.id) ?? ''}
+					projectName={findOwningProject(data.projects, server.directory)?.name ?? null}
 					onRefresh={() => store.run(server.id, () => serversApi.status(server.id))}
 					onToggle={() => toggle(server)}
 					onRestart={() => store.run(server.id, () => serversApi.restart(server.id))}

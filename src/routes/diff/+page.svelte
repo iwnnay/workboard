@@ -1,13 +1,13 @@
 <script lang="ts">
 	import type { PageData } from './$types';
 	import type { DiffFile, DiffLine } from '$lib/server/git';
-	import type { Project } from '$lib/types';
 	import { untrack, onMount, tick } from 'svelte';
 	import { SvelteSet, SvelteMap } from 'svelte/reactivity';
 	import { goto, invalidate } from '$app/navigation';
 	import FileEditor from '$lib/components/FileEditor.svelte';
 	import CommitModal from '$lib/components/CommitModal.svelte';
 	import CodeSearchModal from '$lib/components/CodeSearchModal.svelte';
+	import ProjectPicker from '$lib/components/ProjectPicker.svelte';
 	import { diffApi } from '$lib/diff-api';
 	import {
 		ABSENT_DIFF_FINGERPRINT,
@@ -24,14 +24,11 @@
 	const MAX_FILE_LIST_WIDTH = 720;
 
 	// Mutable local mirrors of server state
-	let projects = $state<Project[]>(untrack(() => data.projects));
 	let rangeInput = $state(untrack(() => data.range));
 	let selectedProjectId = $state(untrack(() => data.projectId));
 
-	// Dropdown UI
+	// Navigation
 	let loading = $state(false);
-	let dropdownOpen = $state(false);
-	let newProjectPath = $state('');
 
 	// File list UI
 	let filterQuery = $state('');
@@ -61,10 +58,6 @@
 	let diffTableRoot = $state<HTMLElement | null>(null);
 
 	// ── Derived ──────────────────────────────────────────────
-
-	const selectedProject = $derived(
-		selectedProjectId ? (projects.find((p) => p.id === selectedProjectId) ?? null) : null
-	);
 
 	const availableFiles = $derived.by(() => {
 		const files = new Map(data.files.map((file) => [file.path, file]));
@@ -344,37 +337,7 @@
 
 	function selectProject(id: string) {
 		selectedProjectId = id;
-		dropdownOpen = false;
 		navigate(id, rangeInput);
-	}
-
-	// ── Projects CRUD ────────────────────────────────────────
-
-	async function addProject() {
-		const path = newProjectPath.trim();
-		if (!path) {
-			return;
-		}
-		const name = deriveName(path);
-		const res = await fetch('/api/projects', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name, path })
-		});
-		const created: Project = await res.json();
-		projects = [...projects, created].sort((a, b) => a.name.localeCompare(b.name));
-		newProjectPath = '';
-		selectProject(created.id);
-	}
-
-	async function deleteProject(id: string, e: MouseEvent) {
-		e.stopPropagation();
-		await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-		projects = projects.filter((p) => p.id !== id);
-		if (selectedProjectId === id) {
-			selectedProjectId = '';
-			navigate('', rangeInput);
-		}
 	}
 
 	// ── Helpers ──────────────────────────────────────────────
@@ -832,17 +795,6 @@
 	}
 </script>
 
-<!-- Close dropdown on backdrop click -->
-{#if dropdownOpen}
-	<div
-		class="backdrop"
-		role="presentation"
-		tabindex="-1"
-		onclick={() => (dropdownOpen = false)}
-		onkeydown={(e) => e.key === 'Escape' && (dropdownOpen = false)}
-	></div>
-{/if}
-
 {#if commitModalOpen}
 	<CommitModal
 		projectId={data.projectId}
@@ -981,68 +933,12 @@
 	<header class="topbar">
 		<span class="topbar-label">Diff</span>
 
-		<!-- Project selector -->
-		<div class="project-selector">
-			<button
-				class="project-btn"
-				class:open={dropdownOpen}
-				onclick={() => (dropdownOpen = !dropdownOpen)}
-				title={selectedProject?.path ?? data.cwd}
-			>
-				<span class="proj-btn-name">{selectedProject?.name ?? projectLabel(data.cwd)}</span>
-				<span class="proj-chevron">▾</span>
-			</button>
-
-			{#if dropdownOpen}
-				<div class="proj-dropdown">
-					<!-- This repo (default) -->
-					<button
-						class="proj-option"
-						class:active={!selectedProjectId}
-						onclick={() => selectProject('')}
-					>
-						<span class="proj-option-name">{projectLabel(data.cwd)}</span>
-						<span class="proj-option-path">{data.cwd}</span>
-					</button>
-
-					{#if projects.length > 0}
-						<div class="proj-divider"></div>
-						{#each projects as p (p.id)}
-							<div class="proj-option-row" class:active={selectedProjectId === p.id}>
-								<button class="proj-option" onclick={() => selectProject(p.id)}>
-									<span class="proj-option-name">{p.name}</span>
-									<span class="proj-option-path">{p.path}</span>
-								</button>
-								<button
-									class="proj-del"
-									onclick={(e) => deleteProject(p.id, e)}
-									aria-label="Remove project">×</button
-								>
-							</div>
-						{/each}
-					{/if}
-
-					<div class="proj-divider"></div>
-					<div class="proj-add-row">
-						<input
-							bind:value={newProjectPath}
-							class="proj-add-input"
-							placeholder="/path/to/repo"
-							spellcheck="false"
-							onkeydown={(e) => {
-								if (e.key === 'Enter') {
-									addProject();
-								}
-								if (e.key === 'Escape') {
-									dropdownOpen = false;
-								}
-							}}
-						/>
-						<button class="proj-add-btn" onclick={addProject}>Add</button>
-					</div>
-				</div>
-			{/if}
-		</div>
+		<ProjectPicker
+			projects={data.projects}
+			selectedId={selectedProjectId}
+			onSelect={selectProject}
+			defaultOption={{ label: projectLabel(data.appRoot), path: data.appRoot }}
+		/>
 
 		<!-- Range input -->
 		<input
@@ -1392,12 +1288,6 @@
 
 <style>
 	/* ── Layout ─────────────────────────────────────────────── */
-	.backdrop {
-		position: fixed;
-		inset: 0;
-		z-index: 40;
-	}
-
 	.page {
 		display: flex;
 		flex-direction: column;
@@ -1435,190 +1325,6 @@
 	.body.resizing {
 		user-select: none;
 		cursor: col-resize;
-	}
-
-	/* ── Project selector ───────────────────────────────────── */
-	.project-selector {
-		position: relative;
-		flex-shrink: 0;
-	}
-
-	.project-btn {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		color: var(--text-2);
-		padding: 0.3rem 0.625rem;
-		font-size: 0.8125rem;
-		white-space: nowrap;
-		transition:
-			background 0.15s,
-			border-color 0.15s;
-	}
-
-	.project-btn:hover,
-	.project-btn.open {
-		background: var(--surface-2);
-		border-color: var(--accent-muted);
-	}
-
-	.proj-btn-name {
-		max-width: 140px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-	}
-
-	.proj-chevron {
-		color: var(--text-ghost);
-		font-size: 0.6875rem;
-	}
-
-	/* ── Dropdown ───────────────────────────────────────────── */
-	.proj-dropdown {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		z-index: 50;
-		width: 300px;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 8px;
-		box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-		overflow: hidden;
-	}
-
-	.proj-option {
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		width: 100%;
-		padding: 0.5rem 0.75rem;
-		background: none;
-		border: none;
-		text-align: left;
-		gap: 1px;
-		transition: background 0.1s;
-		cursor: pointer;
-	}
-
-	.proj-option:hover {
-		background: var(--accent-bg);
-	}
-
-	.proj-option-row {
-		display: flex;
-		align-items: stretch;
-	}
-
-	.proj-option-row .proj-option {
-		flex: 1;
-		min-width: 0;
-	}
-
-	.proj-option-row.active .proj-option,
-	.proj-option-row.active {
-		background: var(--accent-bg);
-	}
-
-	.proj-option.active {
-		background: var(--accent-bg);
-	}
-
-	.proj-option-name {
-		font-size: 0.8125rem;
-		font-weight: 500;
-		color: var(--text-2);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		width: 100%;
-	}
-
-	.proj-option-row.active .proj-option-name,
-	.proj-option.active .proj-option-name {
-		color: var(--accent);
-	}
-
-	.proj-option-path {
-		font-size: 0.6875rem;
-		color: var(--text-ghost);
-		font-family: 'Courier New', monospace;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		width: 100%;
-	}
-
-	.proj-del {
-		flex-shrink: 0;
-		background: none;
-		border: none;
-		color: transparent;
-		font-size: 1rem;
-		padding: 0 0.625rem;
-		transition: color 0.1s;
-		cursor: pointer;
-	}
-
-	.proj-option-row:hover .proj-del {
-		color: var(--text-ghost);
-	}
-
-	.proj-option-row:hover .proj-del:hover {
-		color: var(--accent);
-	}
-
-	.proj-divider {
-		height: 1px;
-		background: var(--border-2);
-		margin: 0.25rem 0;
-	}
-
-	.proj-add-row {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.5rem 0.625rem;
-	}
-
-	.proj-add-input {
-		flex: 1;
-		background: var(--bg-2);
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		color: var(--text);
-		padding: 0.3rem 0.5rem;
-		font-size: 0.8rem;
-		font-family: 'Courier New', monospace;
-		outline: none;
-		transition: border-color 0.15s;
-	}
-
-	.proj-add-input:focus {
-		border-color: var(--accent);
-	}
-
-	.proj-add-input::placeholder {
-		color: var(--text-ghost);
-	}
-
-	.proj-add-btn {
-		background: var(--accent-bg);
-		border: 1px solid var(--accent-muted);
-		border-radius: 5px;
-		color: var(--accent);
-		padding: 0.3rem 0.625rem;
-		font-size: 0.8rem;
-		flex-shrink: 0;
-		transition: background 0.15s;
-	}
-
-	.proj-add-btn:hover {
-		background: var(--accent-muted);
-		color: var(--text);
 	}
 
 	/* ── Range input ────────────────────────────────────────── */

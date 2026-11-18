@@ -2,6 +2,7 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { untrack } from 'svelte';
 	import type { PageData } from './$types';
+	import ProjectPicker from '$lib/components/ProjectPicker.svelte';
 	import type { TreeNode } from '../api/docs/tree/+server';
 	import type {
 		ParsedFile,
@@ -21,13 +22,9 @@
 		parsed: ParsedFile;
 	}
 
-	type Project = { id: string; name: string; path: string };
-
 	let { data }: { data: PageData } = $props();
 
-	// untrack: intentionally read initial server value; list is managed locally afterward
-	let projects: Project[] = $state(untrack(() => data.projects));
-	let projectId = $state(untrack(() => data.projects[0]?.id ?? ''));
+	let chosenProjectId = $state(untrack(() => data.projects[0]?.id ?? ''));
 	let tree: TreeNode[] = $state([]);
 	let expanded = new SvelteSet<string>();
 	let selectedPath = $state<string | null>(null);
@@ -35,10 +32,12 @@
 	let viewMode = $state<'summary' | 'raw'>('summary');
 	let loadingFile = $state(false);
 	let loadingTree = $state(false);
-	let showProjectMenu = $state(false);
-	let addingProject = $state(false);
-	let newName = $state('');
-	let newPath = $state('');
+
+	const projectId = $derived(
+		data.projects.some((entry) => entry.id === chosenProjectId)
+			? chosenProjectId
+			: (data.projects[0]?.id ?? '')
+	);
 
 	$effect(() => {
 		void loadTree(projectId);
@@ -81,33 +80,6 @@
 			expanded.delete(path);
 		} else {
 			expanded.add(path);
-		}
-	}
-
-	async function addProject() {
-		if (!newName.trim() || !newPath.trim()) {
-			return;
-		}
-		const res = await fetch('/api/projects', {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ name: newName.trim(), path: newPath.trim() })
-		});
-		if (res.ok) {
-			const p = await res.json();
-			projects = [...projects, p];
-			projectId = p.id;
-			addingProject = false;
-			newName = '';
-			newPath = '';
-		}
-	}
-
-	async function removeProject(id: string) {
-		await fetch(`/api/projects/${id}`, { method: 'DELETE' });
-		projects = projects.filter((p) => p.id !== id);
-		if (projectId === id) {
-			projectId = projects[0]?.id ?? '';
 		}
 	}
 
@@ -168,7 +140,6 @@
 		fileInfo ? Array.from({ length: fileInfo.lineCount }, (_, i) => i + 1) : []
 	);
 
-	let currentProject = $derived(projects.find((p) => p.id === projectId));
 	let fileName = $derived(selectedPath ? (selectedPath.split('/').pop() ?? selectedPath) : '');
 
 	let hasParsedContent = $derived(
@@ -181,65 +152,15 @@
 	);
 </script>
 
-<div
-	class="docs-page"
-	role="presentation"
-	onclick={() => {
-		showProjectMenu = false;
-	}}
->
+<div class="docs-page">
 	<!-- Top bar -->
 	<header class="topbar">
 		<span class="page-title">Docs</span>
-		<div class="project-selector" role="presentation" onclick={(e) => e.stopPropagation()}>
-			<button class="project-btn" onclick={() => (showProjectMenu = !showProjectMenu)}>
-				<span class="project-name">{currentProject?.name ?? 'Select project'}</span>
-				<span class="chevron">▾</span>
-			</button>
-			{#if showProjectMenu}
-				<div class="project-menu">
-					{#each projects as p (p.id)}
-						<div class="project-row">
-							<button
-								class="project-option"
-								class:active={p.id === projectId}
-								onclick={() => {
-									projectId = p.id;
-									showProjectMenu = false;
-								}}
-							>
-								{p.name}
-								<span class="project-path">{p.path}</span>
-							</button>
-							<button class="remove-btn" title="Remove" onclick={() => removeProject(p.id)}
-								>✕</button
-							>
-						</div>
-					{/each}
-					{#if addingProject}
-						<div class="add-form">
-							<input bind:value={newName} placeholder="Project name" class="add-input" />
-							<input bind:value={newPath} placeholder="/absolute/path" class="add-input" />
-							<div class="add-actions">
-								<button class="btn-confirm" onclick={addProject}>Add</button>
-								<button
-									class="btn-cancel"
-									onclick={() => {
-										addingProject = false;
-										newName = '';
-										newPath = '';
-									}}>Cancel</button
-								>
-							</div>
-						</div>
-					{:else}
-						<button class="add-project-btn" onclick={() => (addingProject = true)}
-							>+ Add project</button
-						>
-					{/if}
-				</div>
-			{/if}
-		</div>
+		<ProjectPicker
+			projects={data.projects}
+			selectedId={projectId}
+			onSelect={(selected) => (chosenProjectId = selected)}
+		/>
 		{#if selectedPath && fileInfo}
 			<div class="file-breadcrumb">
 				<span class="breadcrumb-path">{selectedPath}</span>
@@ -1032,190 +953,6 @@
 		line-height: 1.6;
 		white-space: pre;
 		tab-size: 2;
-	}
-
-	/* Project selector */
-	.project-selector {
-		position: relative;
-	}
-
-	.project-btn {
-		display: flex;
-		align-items: center;
-		gap: 0.375rem;
-		padding: 0.3rem 0.625rem;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 5px;
-		color: var(--text-2);
-		font-size: 0.8125rem;
-		transition:
-			border-color 0.15s,
-			background 0.15s;
-	}
-
-	.project-btn:hover {
-		border-color: var(--accent-muted);
-		background: var(--accent-bg);
-	}
-
-	.project-name {
-		max-width: 160px;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-
-	.chevron {
-		color: var(--text-ghost);
-		font-size: 0.75rem;
-	}
-
-	.project-menu {
-		position: absolute;
-		top: calc(100% + 4px);
-		left: 0;
-		background: var(--surface-2);
-		border: 1px solid var(--border);
-		border-radius: 7px;
-		padding: 0.375rem;
-		min-width: 280px;
-		z-index: 50;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
-	}
-
-	.project-row {
-		display: flex;
-		align-items: stretch;
-		gap: 2px;
-		margin-bottom: 2px;
-	}
-
-	.project-option {
-		flex: 1;
-		display: flex;
-		flex-direction: column;
-		align-items: flex-start;
-		gap: 1px;
-		padding: 0.375rem 0.5rem;
-		border-radius: 4px;
-		font-size: 0.8125rem;
-		color: var(--text-muted);
-		text-align: left;
-		transition:
-			background 0.1s,
-			color 0.1s;
-	}
-
-	.project-option:hover {
-		background: var(--accent-bg);
-		color: var(--text-2);
-	}
-
-	.project-option.active {
-		background: var(--accent-bg);
-		color: var(--accent);
-	}
-
-	.project-path {
-		font-family: monospace;
-		font-size: 0.7rem;
-		color: var(--text-ghost);
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		max-width: 220px;
-	}
-
-	.remove-btn {
-		padding: 0.375rem 0.5rem;
-		border-radius: 4px;
-		color: var(--text-ghost);
-		font-size: 0.7rem;
-		transition:
-			background 0.1s,
-			color 0.1s;
-	}
-
-	.remove-btn:hover {
-		background: var(--accent-bg);
-		color: var(--accent);
-	}
-
-	.add-project-btn {
-		width: 100%;
-		padding: 0.375rem 0.5rem;
-		border-radius: 4px;
-		color: var(--text-ghost);
-		font-size: 0.8rem;
-		text-align: left;
-		margin-top: 2px;
-		transition:
-			background 0.1s,
-			color 0.1s;
-	}
-
-	.add-project-btn:hover {
-		background: var(--accent-bg);
-		color: var(--text-2);
-	}
-
-	.add-form {
-		display: flex;
-		flex-direction: column;
-		gap: 0.375rem;
-		padding: 0.5rem;
-		border-top: 1px solid var(--border);
-		margin-top: 0.25rem;
-	}
-
-	.add-input {
-		background: var(--bg);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--text);
-		font-size: 0.8rem;
-		padding: 0.3rem 0.5rem;
-		width: 100%;
-		outline: none;
-	}
-
-	.add-input:focus {
-		border-color: var(--accent-muted);
-	}
-
-	.add-actions {
-		display: flex;
-		gap: 0.375rem;
-	}
-
-	.btn-confirm {
-		flex: 1;
-		padding: 0.3rem;
-		background: var(--accent-bg);
-		border: 1px solid var(--accent-muted);
-		border-radius: 4px;
-		color: var(--accent);
-		font-size: 0.8rem;
-		transition: opacity 0.1s;
-	}
-
-	.btn-confirm:hover {
-		opacity: 0.85;
-	}
-
-	.btn-cancel {
-		flex: 1;
-		padding: 0.3rem;
-		background: var(--surface);
-		border: 1px solid var(--border);
-		border-radius: 4px;
-		color: var(--text-muted);
-		font-size: 0.8rem;
-	}
-
-	.btn-cancel:hover {
-		background: var(--bg);
 	}
 
 	/* highlight.js theme — dark red palette */

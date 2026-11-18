@@ -1,16 +1,15 @@
 import type { PageServerLoad } from './$types';
 import { DEFAULT_DIFF_RANGE } from '$lib/constants';
-import { db } from '$lib/server/db';
-import { project } from '$lib/server/db/schema';
+import { listProjects } from '$lib/server/projects';
 import { readDiffFiles } from '$lib/server/diff';
-import { asc } from 'drizzle-orm';
 
 export const load: PageServerLoad = async ({ url, depends }) => {
 	depends('diff:data');
+	depends('app:projects');
 	const range = url.searchParams.get('range') ?? DEFAULT_DIFF_RANGE;
 	const projectId = url.searchParams.get('projectId') ?? '';
 
-	const projects = await db.select().from(project).orderBy(asc(project.name));
+	const projects = await listProjects();
 
 	let cwd = process.cwd();
 	if (projectId) {
@@ -21,5 +20,5 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 	}
 
 	const { files, error } = readDiffFiles(cwd, range);
-	return { files, range, error, projectId, projects, cwd };
+	return { files, range, error, projectId, cwd, appRoot: process.cwd() };
 };

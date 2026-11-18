@@ -1,6 +1,8 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
-import { join, relative, sep } from 'path';
+import { join, posix } from 'path';
 import { MAX_EDITABLE_FILE_BYTES } from '$lib/constants';
+import type { ProjectSettings } from '$lib/project-settings';
+import { attemptGit } from './git';
 
 export type CodeSearchMatch = {
 	path: string;
@@ -9,9 +11,13 @@ export type CodeSearchMatch = {
 	text: string;
 };
 
+export type CodeSearchSource = 'gitignore' | 'folder-walk';
+
 export type CodeSearchResult = {
 	matches: CodeSearchMatch[];
-	directories: string[];
+	source: CodeSearchSource;
+	sourceNote: string | null;
+	testsExcluded: boolean;
 	searchedFiles: number;
 	truncated: boolean;
 };
@@ -19,42 +25,80 @@ export type CodeSearchResult = {
 export type CodeSearchOptions = {
 	root: string;
 	query: string;
+	settings: Pick<ProjectSettings, 'testGlobs' | 'searchExcludeGlobs'>;
 	includeTests?: boolean;
 	maxMatches?: number;
 };
 
-const skippedDirectories = new Set([
+export type CandidateFiles = {
+	paths: string[];
+	source: CodeSearchSource;
+	sourceNote: string | null;
+};
+
+const walkSkippedDirectories = new Set([
 	'node_modules',
 	'.git',
 	'.svelte-kit',
 	'build',
 	'dist',
 	'coverage',
-	'.turbo',
+	'.venv',
+	'venv',
+	'__pycache__',
 	'.next'
 ]);
 
 const maxPreviewLength = 300;
 const defaultMaxMatches = 500;
+const gitListTimeoutMs = 15_000;
 
-const listFiles = (directory: string, collected: string[]): void => {
-	let entries;
-	try {
-		entries = readdirSync(directory, { withFileTypes: true });
-	} catch {
-		return;
-	}
+const walkFolder = (root: string, relativeDirectory: string, collected: string[]): void => {
+	const entries = readdirSync(join(root, relativeDirectory), { withFileTypes: true });
 	for (const entry of entries) {
-		const entryPath = join(directory, entry.name);
+		const relativePath = relativeDirectory ? posix.join(relativeDirectory, entry.name) : entry.name;
 		if (entry.isDirectory()) {
-			if (!skippedDirectories.has(entry.name)) {
-				listFiles(entryPath, collected);
+			if (!walkSkippedDirectories.has(entry.name)) {
+				walkFolder(root, relativePath, collected);
 			}
 		} else if (entry.isFile()) {
-			collected.push(entryPath);
+			collected.push(relativePath);
 		}
 	}
 };
+
+export const listCandidateFiles = (root: string): CandidateFiles => {
+	const outcome = attemptGit(
+		['ls-files', '--cached', '--others', '--exclude-standard', '-z'],
+		root,
+		'listing files for code search',
+		gitListTimeoutMs
+	);
+	const collected: string[] = [];
+	if (outcome.failure === null) {
+		return {
+			paths: [...new Set(outcome.stdout.split('\0').filter(Boolean))],
+			source: 'gitignore',
+			sourceNote: null
+		};
+	}
+	try {
+		walkFolder(root, '', collected);
+	} catch (caught) {
+		throw new Error(
+			`listing files for code search in ${root}: git failed (${outcome.failure}) and walking the folder failed: ${(caught as Error).message}`,
+			{ cause: caught }
+		);
+	}
+	return {
+		paths: collected,
+		source: 'folder-walk',
+		sourceNote: `Not a git repository, so .gitignore was not applied: ${outcome.failure}`
+	};
+};
+
+const matchesAny = (path: string, globs: string[]): boolean =>
+	globs.some((glob) => posix.matchesGlob(path, glob));
 
 const readSearchableText = (absolutePath: string): string | null => {
 	try {
@@ -78,32 +122,26 @@ const previewOf = (lineText: string, column: number): string => {
 	return `…${trimmed.slice(start, start + maxPreviewLength)}…`;
 };
 
-const alwaysSearchedDirectories = ['src', 'db', 'scripts', 'packages'];
-
-export const searchDirectories = (includeTests: boolean): string[] =>
-	includeTests ? [...alwaysSearchedDirectories, 'tests'] : alwaysSearchedDirectories;
-
 export const searchCode = (options: CodeSearchOptions): CodeSearchResult => {
-	const { root, query, includeTests = false, maxMatches = defaultMaxMatches } = options;
-	const directories = searchDirectories(includeTests);
-	const files: string[] = [];
+	const { root, query, settings, includeTests = false, maxMatches = defaultMaxMatches } = options;
+	const candidates = listCandidateFiles(root);
+	const excludedGlobs = includeTests
+		? settings.searchExcludeGlobs
+		: [...settings.searchExcludeGlobs, ...settings.testGlobs];
+	const files = candidates.paths
+		.filter((path) => !matchesAny(path, excludedGlobs))
+		.sort((first, second) => first.localeCompare(second));
 	const matches: CodeSearchMatch[] = [];
 	let truncated = false;
 
-	for (const directory of directories) {
-		listFiles(join(root, directory), files);
-	}
-	files.sort((first, second) => first.localeCompare(second));
-
-	for (const absolutePath of files) {
+	for (const relativePath of files) {
 		if (truncated) {
 			break;
 		}
-		const content = readSearchableText(absolutePath);
+		const content = readSearchableText(join(root, relativePath));
 		if (content === null || !content.includes(query)) {
 			continue;
 		}
-		const relativePath = relative(root, absolutePath).split(sep).join('/');
 		const lines = content.replace(/\r\n/g, '\n').split('\n');
 		for (const [lineIndex, lineText] of lines.entries()) {
 			const column = lineText.indexOf(query);
@@ -123,5 +161,12 @@ export const searchCode = (options: CodeSearchOptions): CodeSearchResult => {
 		}
 	}
 
-	return { matches, directories, searchedFiles: files.length, truncated };
+	return {
+		matches,
+		source: candidates.source,
+		sourceNote: candidates.sourceNote,
+		testsExcluded: !includeTests && settings.testGlobs.length > 0,
+		searchedFiles: files.length,
+		truncated
+	};
 };

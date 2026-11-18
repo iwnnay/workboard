@@ -1,12 +1,11 @@
 import type { PageServerLoad } from './$types';
-import { asc } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { project } from '$lib/server/db/schema';
+import { listProjects } from '$lib/server/projects';
 import { getFullReviewState } from '$lib/server/full-review';
 
 export const load: PageServerLoad = async ({ url, depends }) => {
 	depends('full-review:data');
-	const projects = await db.select().from(project).orderBy(asc(project.name));
+	depends('app:projects');
+	const projects = await listProjects();
 	const requestedId = url.searchParams.get('projectId') ?? '';
 	const projectId = projects.some((entry) => entry.id === requestedId)
 		? requestedId
@@ -14,5 +13,5 @@ export const load: PageServerLoad = async ({ url, depends }) => {
 	const review = projectId
 		? await getFullReviewState(projectId)
 		: { directories: [], files: [], baselineAt: null, lastPolledAt: null };
-	return { projects, projectId, review };
+	return { projectId, review };
 };

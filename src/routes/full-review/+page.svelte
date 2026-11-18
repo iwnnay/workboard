@@ -4,6 +4,8 @@
 	import { api } from '$lib/api';
 	import { goto } from '$app/navigation';
 	import { onMount, untrack } from 'svelte';
+	import ProjectPicker from '$lib/components/ProjectPicker.svelte';
+	import { projectsManager } from '$lib/projects-manager.svelte';
 
 	let { data }: { data: PageData } = $props();
 	let review = $state<FullReviewState>(untrack(() => data.review));
@@ -183,16 +185,7 @@
 			<h1>Full Review</h1>
 			<span>Long-running codebase review</span>
 		</div>
-		<select
-			aria-label="Project"
-			value={data.projectId}
-			onchange={(event) => selectProject(event.currentTarget.value)}
-		>
-			{#if data.projects.length === 0}<option value="">No projects</option>{/if}
-			{#each data.projects as project (project.id)}
-				<option value={project.id}>{project.name}</option>
-			{/each}
-		</select>
+		<ProjectPicker projects={data.projects} selectedId={data.projectId} onSelect={selectProject} />
 		<div class="spacer"></div>
 		<button
 			class="button secondary"
@@ -230,7 +223,8 @@
 	{#if !selectedProject}
 		<main class="empty">
 			<h2>No project selected</h2>
-			<p>Add a project from the Diff or Docs page first.</p>
+			<p>Add a project to start reviewing it.</p>
+			<button class="button primary" onclick={() => projectsManager.show()}>Add a project</button>
 		</main>
 	{:else if review.directories.length === 0}
 		<main class="empty">
@@ -342,7 +336,6 @@
 	.spacer {
 		flex: 1;
 	}
-	select,
 	input,
 	textarea {
 		background: var(--bg-2);
@@ -351,11 +344,6 @@
 		border-radius: 5px;
 		outline: none;
 	}
-	select {
-		padding: 0.35rem 2rem 0.35rem 0.55rem;
-		max-width: 240px;
-	}
-	select:focus,
 	input:focus,
 	textarea:focus {
 		border-color: var(--accent-muted);

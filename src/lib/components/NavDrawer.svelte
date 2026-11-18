@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { projectsManager } from '$lib/projects-manager.svelte';
 
 	let open = $state(false);
 
@@ -17,6 +18,11 @@
 	function close() {
 		open = false;
 	}
+
+	const openProjects = () => {
+		close();
+		projectsManager.show();
+	};
 </script>
 
 {#if open}
@@ -42,6 +48,8 @@
 					{item.label}
 				</a>
 			{/each}
+			<div class="nav-divider"></div>
+			<button class="nav-item nav-button" onclick={openProjects}>Projects…</button>
 		</nav>
 	{/if}
 
@@ -103,6 +111,17 @@
 	.nav-item:hover {
 		background: var(--accent-bg);
 		color: var(--text-2);
+	}
+
+	.nav-button {
+		width: 100%;
+		text-align: left;
+	}
+
+	.nav-divider {
+		height: 1px;
+		margin: 0.25rem 0.375rem;
+		background: var(--border);
 	}
 
 	.nav-item.active {

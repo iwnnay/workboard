@@ -1,6 +1,5 @@
 import { api, query } from './api';
 import type {
-	DirectoryListing,
 	ManagedServerDraft,
 	ManagedServerWithStatus,
 	ServerDetection,
@@ -26,8 +25,5 @@ export const serversApi = {
 	restart: (id: string) => api.post<ServerStatus>(`/api/servers/${id}/restart`),
 
 	detect: (directory: string) =>
-		api.get<ServerDetection>(`/api/servers/detect${query({ directory })}`),
-
-	browse: (path?: string | null) =>
-		api.get<DirectoryListing>(`/api/servers/browse${query({ path })}`)
+		api.get<ServerDetection>(`/api/servers/detect${query({ directory })}`)
 };

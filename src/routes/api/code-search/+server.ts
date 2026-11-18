@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { badRequest, route } from '$lib/server/http';
-import { resolveProjectRoot } from '$lib/server/projects';
+import { resolveProjectContext } from '$lib/server/projects';
 import { searchCode } from '$lib/server/code-search';
 
 const maxQueryLength = 200;
@@ -23,6 +23,6 @@ export const GET: RequestHandler = ({ url }) =>
 				`searching code: the query is ${query.length} characters, longer than the ${maxQueryLength}-character limit`
 			);
 		}
-		const root = await resolveProjectRoot(projectId);
-		return { root, ...searchCode({ root, query, includeTests }) };
+		const { root, settings } = await resolveProjectContext(projectId);
+		return { root, ...searchCode({ root, query, settings, includeTests }) };
 	});
