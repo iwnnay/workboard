@@ -478,7 +478,7 @@
 	}
 
 	.hint.found {
-		color: #86efac;
+		color: var(--success);
 	}
 
 	.command-preview {

@@ -20,39 +20,6 @@
 {/if}
 
 <style>
-	:global(:root) {
-		--diff-text: var(--text-2);
-
-		--diff-add-text: #9de8b0;
-		--diff-add-bg: #071507;
-		--diff-add-gutter-bg: #0a1f0a;
-		--diff-add-gutter-text: #4a8f5a;
-		--diff-add-strong: #4ade80;
-
-		--diff-del-text: #e8a0a0;
-		--diff-del-bg: #1e0505;
-		--diff-del-gutter-bg: #2a0808;
-		--diff-del-gutter-text: #8f4a4a;
-		--diff-del-strong: #ef4444;
-
-		--diff-incremental-add-bg: #092724;
-		--diff-incremental-add-gutter-bg: #0d3530;
-		--diff-incremental-add-text: #76e6d5;
-		--diff-incremental-del-bg: #301805;
-		--diff-incremental-del-gutter-bg: #442208;
-		--diff-incremental-del-text: #f3b562;
-
-		--diff-hunk-bg: #0d1a0d;
-		--diff-hunk-text: #4a8f5a;
-
-		--diff-untracked-text: #c9a84c;
-		--diff-untracked-bg: #0f0e02;
-		--diff-untracked-border: #2a2508;
-
-		--diff-highlight-bg: rgba(250, 220, 80, 0.28);
-		--diff-highlight-outline: rgba(250, 220, 80, 0.4);
-	}
-
 	:global(*, *::before, *::after) {
 		box-sizing: border-box;
 		margin: 0;

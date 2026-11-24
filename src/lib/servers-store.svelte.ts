@@ -72,7 +72,7 @@ export class ServersStore {
 	}
 
 	/** True when a poll would be redundant because one just ran. */
-	polledWithin(gapMs: number): boolean {
-		return this.lastCheckedAt !== null && Date.now() - this.lastCheckedAt < gapMs;
+	polledWithin(gapMilliseconds: number): boolean {
+		return this.lastCheckedAt !== null && Date.now() - this.lastCheckedAt < gapMilliseconds;
 	}
 }

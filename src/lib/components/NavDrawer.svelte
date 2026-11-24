@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { page } from '$app/state';
 	import { projectsManager } from '$lib/projects-manager.svelte';
+	import ServersModal from '$lib/components/ServersModal.svelte';
 
 	let open = $state(false);
+	let serversOpen = $state(false);
 
 	const navItems = [
 		{ href: '/', label: 'Dashboard' },
@@ -11,8 +13,7 @@
 		{ href: '/full-review', label: 'Full Review' },
 		{ href: '/compare', label: 'Compare' },
 		{ href: '/docs', label: 'Docs' },
-		{ href: '/ollama', label: 'Ollama' },
-		{ href: '/servers', label: 'Servers' }
+		{ href: '/ollama', label: 'Ollama' }
 	];
 
 	function close() {
@@ -22,6 +23,11 @@
 	const openProjects = () => {
 		close();
 		projectsManager.show();
+	};
+
+	const openServers = () => {
+		close();
+		serversOpen = true;
 	};
 </script>
 
@@ -53,18 +59,36 @@
 		</nav>
 	{/if}
 
-	<button
-		class="nav-toggle"
-		class:is-open={open}
-		onclick={() => (open = !open)}
-		aria-label="Toggle navigation"
-		aria-expanded={open}
-	>
-		<span class="bar"></span>
-		<span class="bar"></span>
-		<span class="bar"></span>
-	</button>
+	<div class="nav-buttons">
+		<button
+			class="nav-toggle"
+			class:is-open={open}
+			onclick={() => (open = !open)}
+			aria-label="Toggle navigation"
+			aria-expanded={open}
+		>
+			<span class="bar"></span>
+			<span class="bar"></span>
+			<span class="bar"></span>
+		</button>
+		<button
+			class="servers-toggle"
+			class:is-open={serversOpen}
+			onclick={openServers}
+			aria-label="Open servers"
+			title="Servers"
+		>
+			<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+				<rect x="3" y="4" width="18" height="12" rx="1.5" />
+				<path d="M9 20h6M12 16v4" />
+			</svg>
+		</button>
+	</div>
 </div>
+
+{#if serversOpen}
+	<ServersModal onClose={() => (serversOpen = false)} />
+{/if}
 
 <style>
 	.backdrop {
@@ -126,6 +150,42 @@
 
 	.nav-item.active {
 		background: var(--accent-bg);
+		color: var(--accent);
+	}
+
+	.nav-buttons {
+		display: flex;
+		gap: 0.375rem;
+	}
+
+	.servers-toggle {
+		width: 34px;
+		height: 34px;
+		background: var(--surface-2);
+		border: 1px solid var(--border);
+		border-radius: 6px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		color: var(--text-dim);
+		transition:
+			background 0.15s,
+			border-color 0.15s,
+			color 0.15s;
+	}
+
+	.servers-toggle svg {
+		fill: none;
+		stroke: currentColor;
+		stroke-width: 1.75;
+		stroke-linecap: round;
+		stroke-linejoin: round;
+	}
+
+	.servers-toggle:hover,
+	.servers-toggle.is-open {
+		background: var(--accent-bg);
+		border-color: var(--accent-muted);
 		color: var(--accent);
 	}
 

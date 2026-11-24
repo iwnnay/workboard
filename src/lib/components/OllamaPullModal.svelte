@@ -267,7 +267,7 @@
 	}
 
 	.queue-item.done {
-		border-color: #2f6f4a;
+		border-color: var(--success-border);
 	}
 
 	.queue-item.failed {
@@ -302,7 +302,7 @@
 	}
 
 	.item-status.status-done {
-		color: #86efac;
+		color: var(--success);
 	}
 	.item-status.status-error {
 		color: var(--accent);
@@ -339,7 +339,7 @@
 	}
 
 	.bar-fill.status-done {
-		background: #86efac;
+		background: var(--success);
 	}
 	.bar-fill.status-error {
 		background: var(--accent-muted);

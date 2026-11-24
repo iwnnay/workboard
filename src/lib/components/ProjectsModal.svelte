@@ -554,7 +554,7 @@
 	}
 
 	.status-dot.running {
-		background: #4ade80;
+		background: var(--success-strong);
 	}
 
 	.server-port {

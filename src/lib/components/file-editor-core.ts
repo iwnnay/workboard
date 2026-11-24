@@ -115,72 +115,79 @@ function languageExtension(filePath: string): Extension {
 	}
 }
 
-// Maps the app's dark-red palette (CSS vars from +layout.svelte) onto the
+// Maps the active theme's palette (CSS vars from $lib/themes) onto the
 // editor. CodeMirror injects these styles at document level, so Svelte
 // scoped styles cannot reach them.
-const editorTheme = EditorView.theme(
-	{
-		'&': {
-			backgroundColor: 'var(--bg-2)',
-			color: 'var(--text-2)',
-			height: '100%',
-			fontSize: '0.8125rem'
+const editorTheme = (dark: boolean) =>
+	EditorView.theme(
+		{
+			'&': {
+				backgroundColor: 'var(--bg-2)',
+				color: 'var(--text-2)',
+				height: '100%',
+				fontSize: '0.8125rem'
+			},
+			'.cm-scroller': {
+				fontFamily: "'Courier New', monospace",
+				lineHeight: '1.5',
+				overflow: 'auto'
+			},
+			'.cm-content': { caretColor: 'var(--accent)' },
+			'.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)' },
+			'&.cm-focused .cm-fat-cursor': { background: 'var(--accent-muted)' },
+			'&:not(.cm-focused) .cm-fat-cursor': {
+				background: 'none',
+				outline: '1px solid var(--accent-muted)'
+			},
+			'.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+				backgroundColor: 'var(--accent-bg)'
+			},
+			'.cm-selectionMatch': { backgroundColor: 'rgba(250, 220, 80, 0.15)' },
+			'.cm-activeLine': { backgroundColor: 'var(--accent-soft)' },
+			'.cm-gutters': {
+				backgroundColor: 'var(--bg-2)',
+				color: 'var(--text-ghost)',
+				border: 'none',
+				borderRight: '1px solid var(--border-2)'
+			},
+			'.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text-dim)' },
+			'.cm-matchingBracket': {
+				backgroundColor: 'var(--accent-bg)',
+				outline: '1px solid var(--accent-muted)'
+			},
+			'.cm-panels': {
+				backgroundColor: 'var(--surface)',
+				color: 'var(--text-2)',
+				borderTop: '1px solid var(--border)',
+				fontFamily: "'Courier New', monospace"
+			},
+			'.cm-vim-panel input': {
+				color: 'var(--text)',
+				fontFamily: "'Courier New', monospace"
+			}
 		},
-		'.cm-scroller': {
-			fontFamily: "'Courier New', monospace",
-			lineHeight: '1.5',
-			overflow: 'auto'
-		},
-		'.cm-content': { caretColor: 'var(--accent)' },
-		'.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)' },
-		'&.cm-focused .cm-fat-cursor': { background: 'var(--accent-muted)' },
-		'&:not(.cm-focused) .cm-fat-cursor': {
-			background: 'none',
-			outline: '1px solid var(--accent-muted)'
-		},
-		'.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-			backgroundColor: 'var(--accent-bg)'
-		},
-		'.cm-selectionMatch': { backgroundColor: 'rgba(250, 220, 80, 0.15)' },
-		'.cm-activeLine': { backgroundColor: 'var(--accent-soft)' },
-		'.cm-gutters': {
-			backgroundColor: 'var(--bg-2)',
-			color: 'var(--text-ghost)',
-			border: 'none',
-			borderRight: '1px solid var(--border-2)'
-		},
-		'.cm-activeLineGutter': { backgroundColor: 'transparent', color: 'var(--text-dim)' },
-		'.cm-matchingBracket': {
-			backgroundColor: 'var(--accent-bg)',
-			outline: '1px solid var(--accent-muted)'
-		},
-		'.cm-panels': {
-			backgroundColor: 'var(--surface)',
-			color: 'var(--text-2)',
-			borderTop: '1px solid var(--border)',
-			fontFamily: "'Courier New', monospace"
-		},
-		'.cm-vim-panel input': {
-			color: 'var(--text)',
-			fontFamily: "'Courier New', monospace"
-		}
-	},
-	{ dark: true }
-);
+		{ dark }
+	);
+
+const documentPrefersDark = (): boolean =>
+	getComputedStyle(document.documentElement).colorScheme !== 'light';
 
 const editorHighlightStyle = HighlightStyle.define([
-	{ tag: tags.keyword, color: '#e57373' },
-	{ tag: [tags.string, tags.special(tags.string), tags.regexp], color: '#c9a84c' },
+	{ tag: tags.keyword, color: 'var(--editor-keyword)' },
+	{ tag: [tags.string, tags.special(tags.string), tags.regexp], color: 'var(--editor-string)' },
 	{ tag: tags.comment, color: 'var(--text-ghost)', fontStyle: 'italic' },
-	{ tag: [tags.number, tags.bool, tags.null], color: '#d8956f' },
-	{ tag: [tags.function(tags.variableName), tags.function(tags.propertyName)], color: '#9de8b0' },
-	{ tag: [tags.typeName, tags.className, tags.namespace], color: '#8fbcd4' },
-	{ tag: [tags.propertyName, tags.attributeName], color: '#d4a5a5' },
+	{ tag: [tags.number, tags.bool, tags.null], color: 'var(--editor-number)' },
+	{
+		tag: [tags.function(tags.variableName), tags.function(tags.propertyName)],
+		color: 'var(--editor-function)'
+	},
+	{ tag: [tags.typeName, tags.className, tags.namespace], color: 'var(--editor-type)' },
+	{ tag: [tags.propertyName, tags.attributeName], color: 'var(--editor-property)' },
 	{ tag: [tags.operator, tags.punctuation, tags.bracket], color: 'var(--text-dim)' },
 	{ tag: [tags.variableName, tags.definition(tags.variableName)], color: 'var(--text-2)' },
-	{ tag: tags.tagName, color: '#e57373' },
+	{ tag: tags.tagName, color: 'var(--editor-keyword)' },
 	{ tag: tags.heading, color: 'var(--text)', fontWeight: 'bold' },
-	{ tag: tags.link, color: '#8fbcd4', textDecoration: 'underline' },
+	{ tag: tags.link, color: 'var(--editor-type)', textDecoration: 'underline' },
 	{ tag: tags.invalid, color: 'var(--accent)' }
 ]);
 
@@ -191,6 +198,7 @@ export function createFileEditor(options: {
 	handlers: FileEditorHandlers;
 }): FileEditorHandle {
 	const { parent, doc, filePath, handlers } = options;
+	const dark = documentPrefersDark();
 	registerExCommands();
 	activeHandlers = handlers;
 
@@ -213,7 +221,7 @@ export function createFileEditor(options: {
 			bracketMatching(),
 			syntaxHighlighting(editorHighlightStyle, { fallback: true }),
 			languageExtension(filePath),
-			editorTheme,
+			editorTheme(dark),
 			EditorView.updateListener.of((update) => {
 				if (!update.docChanged || !lastSavedDoc) {
 					return;

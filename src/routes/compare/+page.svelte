@@ -299,14 +299,14 @@
 
 	/* ── Diff marks ─────────────────────────────────────────── */
 	:global(mark.del) {
-		background: #2a0808;
-		color: #e8a0a0;
+		background: var(--diff-del-gutter-bg);
+		color: var(--diff-del-text);
 		border-radius: 2px;
 	}
 
 	:global(mark.ins) {
-		background: #0a1f0a;
-		color: #9de8b0;
+		background: var(--diff-add-gutter-bg);
+		color: var(--diff-add-text);
 		border-radius: 2px;
 	}
 </style>

@@ -110,7 +110,7 @@
 	}
 
 	.server-card.running {
-		border-color: #2f6f4a;
+		border-color: var(--success-border);
 	}
 
 	.card-main {
@@ -133,7 +133,7 @@
 	}
 
 	.dot.on {
-		background: #86efac;
+		background: var(--success);
 	}
 
 	.alias {
@@ -196,15 +196,15 @@
 	}
 
 	.pill.on {
-		color: #86efac;
-		border-color: #2f6f4a;
-		background: #0e2417;
+		color: var(--success);
+		border-color: var(--success-border);
+		background: var(--success-bg);
 	}
 
 	.pill.warn {
-		color: #fbbf24;
-		border-color: #78571a;
-		background: #241c07;
+		color: var(--warning);
+		border-color: var(--warning-border);
+		background: var(--warning-bg);
 	}
 
 	.actions {

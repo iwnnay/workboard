@@ -818,16 +818,16 @@
 	}
 
 	.fn-name {
-		color: #fbbf24;
+		color: var(--syntax-function);
 	}
 	.class-name {
-		color: #f472b6;
+		color: var(--syntax-keyword);
 	}
 	.type-name {
-		color: #c084fc;
+		color: var(--syntax-type);
 	}
 	.method-name {
-		color: #93c5fd;
+		color: var(--syntax-property);
 		font-family: monospace;
 		font-size: 0.8rem;
 	}
@@ -837,7 +837,7 @@
 		font-size: 0.75rem;
 	}
 	.kw-async {
-		color: #f472b6;
+		color: var(--syntax-keyword);
 		font-size: 0.75rem;
 	}
 	.kw-fn {
@@ -845,15 +845,15 @@
 		font-size: 0.75rem;
 	}
 	.kw-class {
-		color: #f472b6;
+		color: var(--syntax-keyword);
 		font-size: 0.75rem;
 	}
 	.kw-iface {
-		color: #c084fc;
+		color: var(--syntax-type);
 		font-size: 0.75rem;
 	}
 	.kw-type {
-		color: #c084fc;
+		color: var(--syntax-type);
 		font-size: 0.75rem;
 	}
 
@@ -961,35 +961,35 @@
 		background: transparent;
 	}
 	:global(.hljs-keyword, .hljs-selector-tag, .hljs-deletion) {
-		color: #f472b6;
+		color: var(--syntax-keyword);
 	}
 	:global(.hljs-built_in, .hljs-name) {
-		color: #fb923c;
+		color: var(--syntax-builtin);
 	}
 	:global(.hljs-string, .hljs-template-string, .hljs-addition) {
-		color: #86efac;
+		color: var(--syntax-string);
 	}
 	:global(.hljs-comment, .hljs-quote) {
 		color: var(--text-dim);
 		font-style: italic;
 	}
 	:global(.hljs-number, .hljs-literal, .hljs-regexp) {
-		color: #67e8f9;
+		color: var(--syntax-number);
 	}
 	:global(.hljs-title, .hljs-title.class_, .hljs-title.function_) {
-		color: #fbbf24;
+		color: var(--syntax-function);
 	}
 	:global(.hljs-type, .hljs-class .hljs-title) {
-		color: #c084fc;
+		color: var(--syntax-type);
 	}
 	:global(.hljs-attr, .hljs-attribute, .hljs-selector-id, .hljs-selector-class) {
-		color: #93c5fd;
+		color: var(--syntax-property);
 	}
 	:global(.hljs-variable, .hljs-template-variable) {
 		color: var(--text-2);
 	}
 	:global(.hljs-tag) {
-		color: #f97316;
+		color: var(--syntax-tag);
 	}
 	:global(.hljs-meta) {
 		color: var(--text-muted);
@@ -1002,7 +1002,7 @@
 		font-weight: bold;
 	}
 	:global(.hljs-symbol) {
-		color: #a3e635;
+		color: var(--syntax-symbol);
 	}
 	:global(.hljs-params) {
 		color: var(--text);

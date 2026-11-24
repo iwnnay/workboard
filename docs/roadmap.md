@@ -18,4 +18,4 @@
 
 - [ ] Lightweight in-browser IDE (file tree, editor, search) built on projects
 - [ ] Edit files straight from the code search window
-- [ ] Servers as a fly-out panel from the right instead of a separate page (after the IDE)
+- [x] Servers reachable from every page: a monitor button beside the nav drawer opens them in a modal (replaces the old Servers page)

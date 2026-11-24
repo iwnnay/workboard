@@ -483,10 +483,10 @@
 	}
 
 	.status.ok {
-		color: #86efac;
+		color: var(--success);
 	}
 	.status.ok .dot {
-		background: #86efac;
+		background: var(--success);
 	}
 
 	.status.bad {
@@ -681,7 +681,7 @@
 		width: 6px;
 		height: 6px;
 		border-radius: 50%;
-		background: #86efac;
+		background: var(--success);
 	}
 
 	/* Detail panel */
@@ -727,9 +727,9 @@
 		font-weight: 700;
 		text-transform: uppercase;
 		letter-spacing: 0.05em;
-		color: #86efac;
-		border: 1px solid #2f6f4a;
-		background: #0e2417;
+		color: var(--success);
+		border: 1px solid var(--success-border);
+		background: var(--success-bg);
 		border-radius: 4px;
 		padding: 0.1rem 0.4rem;
 	}

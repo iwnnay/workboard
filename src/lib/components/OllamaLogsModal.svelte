@@ -353,6 +353,6 @@
 	}
 
 	.log-line.err {
-		color: #fca5a5;
+		color: var(--danger);
 	}
 </style>

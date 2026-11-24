@@ -448,7 +448,7 @@
 		background: var(--diff-add-strong);
 	}
 	.has-attention {
-		color: #f3b562;
+		color: var(--changed);
 	}
 	.dates {
 		margin-left: auto;
@@ -524,7 +524,7 @@
 		text-decoration: line-through;
 	}
 	.file-row.changed {
-		border-left-color: #9a641c;
+		border-left-color: var(--changed-strong);
 	}
 	.check-wrap {
 		display: flex;
@@ -562,9 +562,9 @@
 		background: var(--diff-add-bg);
 	}
 	.status.updated {
-		color: #f3b562;
-		border-color: #6d4517;
-		background: #241505;
+		color: var(--changed);
+		border-color: var(--changed-border);
+		background: var(--changed-bg);
 	}
 	.status.deleted {
 		color: var(--accent);
